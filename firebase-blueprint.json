@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Personal information and contact details.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "bio": { "type": "string" },
+        "titles": { "type": "array", "items": { "type": "string" } },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "languages": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "email"]
+    },
+    "experience": {
+      "title": "Work Experience",
+      "description": "Professional history.",
+      "type": "object",
+      "properties": {
+        "company": { "type": "string" },
+        "role": { "type": "string" },
+        "period": { "type": "string" },
+        "description": { "type": "array", "items": { "type": "string" } },
+        "order": { "type": "number" }
+      },
+      "required": ["company", "role", "period"]
+    },
+    "skill": {
+      "title": "Skill",
+      "description": "Technical skills and tools.",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "string" } },
+        "order": { "type": "number" }
+      },
+      "required": ["category", "items"]
+    },
+    "project": {
+      "title": "Project",
+      "description": "Portfolio projects.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "techStack": { "type": "array", "items": { "type": "string" } },
+        "link": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "featured": { "type": "boolean" }
+      },
+      "required": ["title", "description"]
+    },
+    "conversation": {
+      "title": "Conversation",
+      "description": "A chat session between a visitor and the admin.",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "visitorName": { "type": "string" },
+        "visitorEmail": { "type": "string" },
+        "unreadCount": { "type": "number" },
+        "isAutoReplied": { "type": "boolean" },
+        "adminTyping": { "type": "boolean" }
+      },
+      "required": ["participants", "updatedAt"]
+    },
+    "message": {
+      "title": "Message",
+      "description": "A single message within a conversation.",
+      "type": "object",
+      "properties": {
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["conversationId", "senderId", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "userProfile/main": {
+      "schema": "userProfile",
+      "description": "The main user profile document."
+    },
+    "experience/{expId}": {
+      "schema": "experience",
+      "description": "Collection of work experience items."
+    },
+    "skills/{skillId}": {
+      "schema": "skill",
+      "description": "Collection of categorized skills."
+    },
+    "projects/{projectId}": {
+      "schema": "project",
+      "description": "Collection of portfolio projects."
+    },
+    "conversations/{conversationId}": {
+      "schema": "conversation",
+      "description": "Active chat conversations."
+    },
+    "conversations/{conversationId}/messages/{messageId}": {
+      "schema": "message",
+      "description": "Messages within a specific conversation."
+    }
+  }
+}

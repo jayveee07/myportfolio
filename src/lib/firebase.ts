@@ -17,9 +17,12 @@ import {
   orderBy, 
   getDocFromServer,
   addDoc,
+  setDoc,
   serverTimestamp
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
+
+import { getVisitorIp } from "./ipService";
 
 const app = initializeApp(firebaseConfig);
 
@@ -30,6 +33,21 @@ export const db = initializeFirestore(app, {
 }, (firebaseConfig as any).firestoreDatabaseId || "(default)");
 
 export const auth = getAuth(app);
+
+setInterval(async () => {
+  const user = auth.currentUser;
+
+  if (user && user.isAnonymous) {
+    const creationTime = new Date(user.metadata.creationTime).getTime();
+    const age = (Date.now() - creationTime) / 1000;
+
+    if (age > 60) {
+      await user.delete();
+      console.log("Anonymous user deleted");
+    }
+  }
+}, 1000); // runs every second
+
 export const googleProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {
@@ -58,18 +76,24 @@ export const signInAsVisitor = () => {
 // Tracking visits
 export const recordVisit = async (path: string) => {
   try {
-    const visitorId = localStorage.getItem('visitor_id') || Math.random().toString(36).substring(7);
-    localStorage.setItem('visitor_id', visitorId);
+    const ip = await getVisitorIp();
+    const visitorId = ip || localStorage.getItem('visitor_id') || Math.random().toString(36).substring(7);
+    if (!localStorage.getItem('visitor_id')) {
+      localStorage.setItem('visitor_id', visitorId);
+    }
     
     const email = localStorage.getItem('visitor_email');
     
-    await addDoc(collection(db, "visits"), {
+    // Identified by IP not Uid to avoid duplication
+    const visitRef = doc(db, "visits", visitorId.replace(/[^a-zA-Z0-9]/g, '_'));
+    await setDoc(visitRef, {
       visitorId,
       email,
       path,
       userAgent: navigator.userAgent,
       timestamp: serverTimestamp(),
-    });
+      lastActive: serverTimestamp(),
+    }, { merge: true });
   } catch (err) {
     console.error("Failed to record visit:", err);
   }

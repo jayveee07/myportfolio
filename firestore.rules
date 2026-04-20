@@ -1,80 +1,54 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Default Deny Catch-all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
+    
     // --- Helper Functions ---
     function isSignedIn() { 
       return request.auth != null; 
     }
     
     function isAdmin() { 
-      return isSignedIn() && request.auth.token.email == "jvpaisan@gmail.com";
+      // Only include specific admin checks if user is logged in and has the verified admin email
+      return isSignedIn() && 
+             request.auth.token != null &&
+             "email" in request.auth.token && 
+             request.auth.token.email == "jvpaisan@gmail.com" &&
+             request.auth.token.email_verified == true;
     }
     
-    function isParticipant(cid) {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/conversations/$(cid)) &&
-             request.auth.uid in get(/databases/$(database)/documents/conversations/$(cid)).data.participants;
-    }
-
-    function incoming() { return request.resource.data; }
-
-    function isValidId(id) { return id is string && id.size() <= 128; }
-
-    // --- Validation Schemas ---
-    function isValidMessage(data) {
-      return data.keys().hasAll(['conversationId', 'text', 'senderId', 'senderName', 'createdAt']) &&
-             data.text is string && data.text.size() <= 3000 &&
-             data.senderId is string &&
-             data.createdAt == request.time;
-    }
-
-    function isValidVisit(data) {
-      return data.keys().hasAll(['timestamp', 'path', 'visitorId']) &&
-             data.timestamp == request.time &&
-             data.path is string && data.path.size() <= 2048 &&
-             data.visitorId is string && data.visitorId.size() <= 128;
+    function isVisitorPath(cid) {
+      // Robust path detection for visitor conversations
+      return cid != null && cid is string && cid.startsWith("vst_");
     }
 
     // --- Portfolio Rules (Public) ---
     match /userProfile/main { allow read: if true; allow write: if isAdmin(); }
-    match /experience/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /skills/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /projects/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /experience/{id} { allow read, list: if true; allow write: if isAdmin(); }
+    match /skills/{id} { allow read, list: if true; allow write: if isAdmin(); }
+    match /projects/{id} { allow read, list: if true; allow write: if isAdmin(); }
     match /test/connection { allow read: if true; }
 
     // --- Visitor Tracking ---
     match /visits/{visitId} {
-      allow create: if isValidVisit(incoming()) && isValidId(visitId);
-      allow read, list: if isAdmin();
-      allow delete, update: if false;
+      allow read, write: if true;
     }
 
     // --- Private Messaging ---
     match /conversations/{conversationId} {
-      allow create: if isSignedIn();
-      allow list, get: if isAdmin();
-      allow get: if isSignedIn() && (isAdmin() || request.auth.uid in resource.data.participants);
+      // Explicitly allow visitors to interact with documents that follow the naming convention
+      // This is the primary security gate for the chat system
+      allow get, write: if isVisitorPath(conversationId) || isAdmin();
+      allow list: if isAdmin();
       
-      allow update: if isAdmin() || (isSignedIn() && (
-        request.auth.uid in resource.data.participants || 
-        (request.resource.data.participants.hasAll(resource.data.participants) && 
-         request.auth.uid in request.resource.data.participants)
-      ));
-
+      // Messages subcollection
       match /messages/{messageId} {
-        allow read, list, get: if isAdmin() || isParticipant(conversationId);
-        allow create: if (isAdmin() || isParticipant(conversationId)) && isValidMessage(incoming()) && isValidId(messageId);
-        allow update: if (isAdmin() || isParticipant(conversationId)) && (
-          // Admin can edit their own messages
-          (request.auth.uid == resource.data.senderId || isAdmin()) &&
-          incoming().diff(resource.data).affectedKeys().hasOnly(['text', 'isEdited'])
-        );
+        allow read, write: if isVisitorPath(conversationId) || isAdmin();
       }
+    }
+    
+    // Catch-all deny for any other collections to prevent data leaks
+    match /{anyCollection}/{anyDoc} {
+      allow read, write: if isAdmin();
     }
   }
 }

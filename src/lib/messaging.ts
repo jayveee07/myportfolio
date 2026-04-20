@@ -9,6 +9,7 @@ import {
   setDoc, 
   doc, 
   getDoc,
+  getDocFromServer,
   getDocs,
   updateDoc,
   Timestamp 
@@ -22,8 +23,11 @@ export interface Message {
   senderId: string;
   senderName?: string;
   senderAvatar?: string;
+  senderIp?: string;
   createdAt: any;
   isEdited?: boolean;
+  isDeleted?: boolean;
+  deletedBy?: string[];
 }
 
 export interface Conversation {
@@ -34,29 +38,32 @@ export interface Conversation {
   visitorName?: string;
   visitorEmail?: string;
   visitorAvatar?: string;
+  visitorUid?: string;
+  visitorIp?: string;
   isAutoReplied?: boolean;
   unreadCount?: number;
   adminTyping?: boolean;
   visitorTyping?: boolean;
 }
 
-const ADMIN_EMAIL = "jvpaisan@gmail.com";
+export const ADMIN_EMAIL = "jvpaisan@gmail.com";
 const ADMIN_UID = "admin_placeholder"; // ideally we should get the real admin UID if possible
 
-const ADMIN_NAME = "John Vince Paisan";
+export const ADMIN_NAME = "John Vince Paisan";
 const ADMIN_AVATAR = "https://ui-avatars.com/api/?name=JV&background=0f172a&color=fff";
 
 const getChatId = (email: string) => {
   return `vst_${email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
 };
 
-export const sendMessage = async (conversationId: string, text: string, visitorInfo: { name: string, id: string, avatar?: string }, isAdminReply: boolean = false) => {
+export const sendMessage = async (conversationId: string, text: string, visitorInfo: { name: string, email: string, avatar?: string, ip?: string }, isAdminReply: boolean = false) => {
   const messageData = {
     conversationId,
     text,
-    senderId: isAdminReply ? "admin" : visitorInfo.id,
+    senderId: isAdminReply ? ADMIN_EMAIL : visitorInfo.email.toLowerCase(),
     senderName: isAdminReply ? ADMIN_NAME : visitorInfo.name,
-    senderAvatar: isAdminReply ? ADMIN_AVATAR : visitorInfo.avatar,
+    senderAvatar: isAdminReply ? ADMIN_AVATAR : (visitorInfo.avatar?.startsWith('data:') ? null : visitorInfo.avatar),
+    senderIp: isAdminReply ? 'admin' : (visitorInfo.ip || 'unknown'),
     createdAt: serverTimestamp(),
   };
 
@@ -111,36 +118,116 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
   await updateDoc(convoRef, updateData);
 };
 
-export const startConversation = async (visitorInfo: { name: string, email: string, avatar?: string }) => {
+export const startConversation = async (visitorInfo: { name: string, email: string, avatar?: string, ip?: string }) => {
+  // Wait for auth to be fully established in the Firestore SDK
+  let attempts = 0;
+  while (!auth.currentUser && attempts < 10) {
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+
+  if (!auth.currentUser) {
+    throw new Error("Authentication failed or timed out. Please try refreshing.");
+  }
+
+  // Final small buffer for rules propagation
+  await new Promise(r => setTimeout(r, 500));
+  
   const conversationId = getChatId(visitorInfo.email);
+  console.log("StartConversation: resolved ID as", conversationId);
   const convoRef = doc(db, "conversations", conversationId);
-  const convoSnap = await getDoc(convoRef);
+  
+  let convoSnap;
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (retryCount < maxRetries) {
+    try {
+      // Use standard getDoc for better compatibility in iframe environments
+      convoSnap = await getDoc(convoRef);
+      break; 
+    } catch (err: any) {
+      if ((err.code === 'permission-denied' || err.code === 'unauthenticated') && retryCount < maxRetries - 1) {
+        console.warn(`Retry ${retryCount + 1}/${maxRetries} on convo fetch [${convoRef.path}]: ${err.message}`);
+        await new Promise(r => setTimeout(r, 800)); 
+        retryCount++;
+      } else {
+        if (err.code === 'permission-denied') {
+          console.error("Critical Permission Denied on conversation:", {
+            path: convoRef.path,
+            uid: auth.currentUser?.uid,
+            authReady: !!auth.currentUser
+          });
+        }
+        throw err;
+      }
+    }
+  }
+
+  if (!convoSnap) {
+    throw new Error("Unable to establish connection to chat server. Please try again in a moment.");
+  }
+
+  const currentUid = auth.currentUser.uid;
 
   if (!convoSnap.exists()) {
-    await setDoc(convoRef, {
-      participants: [auth.currentUser?.uid || "anonymous", "admin"],
-      visitorName: visitorInfo.name,
-      visitorEmail: visitorInfo.email,
-      visitorAvatar: visitorInfo.avatar || null,
-      updatedAt: serverTimestamp(),
-      unreadCount: 0,
-      isAutoReplied: false,
-    });
-  } else {
-    // If it exists, update participants to include current UID to ensure rules pass
-    const currentUid = auth.currentUser?.uid;
-    const updatePayload: any = {};
-    if (visitorInfo.avatar) updatePayload.visitorAvatar = visitorInfo.avatar;
-    
-    if (currentUid) {
-      const data = convoSnap.data() as Conversation;
-      if (!data.participants.includes(currentUid)) {
-        updatePayload.participants = [...data.participants, currentUid];
+    const avatarToSave = visitorInfo.avatar && visitorInfo.avatar.length > 100000 ? null : visitorInfo.avatar;
+
+    let writeSuccess = false;
+    let writeRetry = 0;
+    while (!writeSuccess && writeRetry < 3) {
+      try {
+        await setDoc(convoRef, {
+          participants: [visitorInfo.email.toLowerCase(), ADMIN_EMAIL],
+          visitorUid: currentUid || "anonymous",
+          visitorIp: visitorInfo.ip || 'unknown',
+          visitorName: visitorInfo.name,
+          visitorEmail: visitorInfo.email.toLowerCase(),
+          visitorAvatar: avatarToSave || null,
+          updatedAt: serverTimestamp(),
+          unreadCount: 0,
+          isAutoReplied: false,
+        });
+        writeSuccess = true;
+      } catch (err: any) {
+        if (err.code === 'permission-denied' && writeRetry < 2) {
+          console.warn(`Retry ${writeRetry + 1}/3 on convo creation: ${err.message}`);
+          await new Promise(r => setTimeout(r, 1000));
+          writeRetry++;
+        } else {
+          throw err;
+        }
       }
+    }
+  } else {
+    const updatePayload: any = {};
+    if (visitorInfo.avatar) {
+      updatePayload.visitorAvatar = visitorInfo.avatar.length > 100000 ? null : visitorInfo.avatar;
+    }
+    if (visitorInfo.ip) updatePayload.visitorIp = visitorInfo.ip;
+    
+    // Update visitorUid to current one if they are resuming session 
+    if (currentUid) {
+      updatePayload.visitorUid = currentUid;
     }
     
     if (Object.keys(updatePayload).length > 0) {
-      await updateDoc(convoRef, updatePayload);
+      let updateSuccess = false;
+      let updateRetry = 0;
+      while (!updateSuccess && updateRetry < 3) {
+        try {
+          await updateDoc(convoRef, updatePayload);
+          updateSuccess = true;
+        } catch (err: any) {
+          if (err.code === 'permission-denied' && updateRetry < 2) {
+            console.warn(`Retry ${updateRetry + 1}/3 on convo update: ${err.message}`);
+            await new Promise(r => setTimeout(r, 1000));
+            updateRetry++;
+          } else {
+            throw err;
+          }
+        }
+      }
     }
   }
   
@@ -171,9 +258,9 @@ export const editMessage = async (conversationId: string, messageId: string, new
   const now = Timestamp.now().toMillis();
   const created = msgData.createdAt?.toMillis() || now;
   
-  // 5 minute window
-  if (now - created > 5 * 60 * 1000) {
-    throw new Error("Editing window expired (5 minutes).");
+  // 10 minute window
+  if (now - created > 10 * 60 * 1000) {
+    throw new Error("Editing window expired (10 minutes).");
   }
   
   await updateDoc(msgRef, {
@@ -194,13 +281,60 @@ export const editMessage = async (conversationId: string, messageId: string, new
   }
 };
 
+export const deleteMessage = async (conversationId: string, messageId: string, mode: 'everyone' | 'me') => {
+  const msgRef = doc(db, `conversations/${conversationId}/messages`, messageId);
+  const msgSnap = await getDoc(msgRef);
+  
+  if (!msgSnap.exists()) return;
+  const msgData = msgSnap.data() as Message;
+  const currentEmail = auth.currentUser?.email || localStorage.getItem('visitor_email')?.toLowerCase();
+  if (!currentEmail) return;
+
+  if (mode === 'everyone') {
+    // Only sender or admin can delete for everyone
+    if (msgData.senderId !== currentEmail && auth.currentUser?.email !== ADMIN_EMAIL) {
+      throw new Error("You don't have permission to delete this message for everyone.");
+    }
+
+    await updateDoc(msgRef, {
+      text: "This message was deleted",
+      isDeleted: true
+    });
+
+    // Also update last message in conversation if this was the latest message
+    const convoRef = doc(db, "conversations", conversationId);
+    const convoSnap = await getDoc(convoRef);
+    if (convoSnap.exists()) {
+      const convoData = convoSnap.data() as Conversation;
+      if (convoData.lastMessage === msgData.text) {
+        await updateDoc(convoRef, {
+          lastMessage: "Message deleted"
+        });
+      }
+    }
+  } else {
+    // Delete for myself
+    const deletedBy = msgData.deletedBy || [];
+    if (!deletedBy.includes(currentEmail)) {
+      await updateDoc(msgRef, {
+        deletedBy: [...deletedBy, currentEmail]
+      });
+    }
+  }
+};
+
 export const subscribeToConversation = (conversationId: string, callback: (convo: Conversation) => void) => {
   if (!conversationId) return () => {};
-  return onSnapshot(doc(db, "conversations", conversationId), (snapshot) => {
-    if (snapshot.exists()) {
-      callback({ id: snapshot.id, ...snapshot.data() } as Conversation);
+  return onSnapshot(doc(db, "conversations", conversationId), 
+    (snapshot) => {
+      if (snapshot.exists()) {
+        callback({ id: snapshot.id, ...snapshot.data() } as Conversation);
+      }
+    },
+    (error) => {
+      console.error(`Conversation subscription error (${conversationId}):`, error);
     }
-  });
+  );
 };
 
 export const markAsRead = async (conversationId: string) => {

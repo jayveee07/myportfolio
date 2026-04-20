@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, MessageSquare, User, Check, CheckCheck, Mail } from 'lucide-react';
+import { Send, X, MessageSquare, User, Check, CheckCheck, Mail, Trash2 } from 'lucide-react';
 import { 
   sendMessage, 
   subscribeToMessages, 
   startConversation, 
   subscribeToConversation,
   editMessage,
+  deleteMessage,
   setVisitorTypingStatus,
   Message as MessageType,
   Conversation
 } from '../lib/messaging';
+import { getVisitorIp } from '../lib/ipService';
 import { auth, signInAsVisitor } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Pencil } from 'lucide-react';
@@ -37,7 +39,9 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
   const [isChatReady, setIsChatReady] = useState(false);
   const [adminTyping, setAdminTyping] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [deleteOptionsId, setDeleteOptionsId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState('');
+  const [visitorIp, setVisitorIp] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<any>(null);
@@ -56,41 +60,31 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
   }, [input, currentConvoId]);
 
   useEffect(() => {
+    // Fetch IP on mount
+    getVisitorIp().then(setVisitorIp);
+
     const unsub = onAuthStateChanged(auth, async (u) => {
-      const isAdmin = u?.email === "jvpaisan@gmail.com";
-
-      if (u && !isAdmin && !isFreshLogin) {
-        // This user session survived a refresh (persistent storage)
-        // User wants logout on refresh, so we terminate it.
-        await auth.signOut();
-        localStorage.removeItem('visitor_name');
-        localStorage.removeItem('visitor_email');
-        localStorage.removeItem('visitor_avatar');
-        localStorage.removeItem('visitor_convo_id');
-        setUser(null);
-        setStep('info');
-        setIsChatReady(false);
-        return;
-      }
-
+      console.log("Auth State Changed:", u ? `User: ${u.uid}` : "Logged out");
       setUser(u);
+      
       const savedName = localStorage.getItem('visitor_name');
       const savedEmail = localStorage.getItem('visitor_email');
       const savedAvatar = localStorage.getItem('visitor_avatar');
       const savedConvoId = localStorage.getItem('visitor_convo_id');
 
-      if (u && (isAdmin || isFreshLogin) && savedName && savedEmail) {
+      // Only auto-resume in-widget if this specific tab session 
+      // just authorized (isFreshLogin)
+      if (u && isFreshLogin && savedName && savedEmail) {
         setVisitorName(savedName);
         setVisitorEmail(savedEmail);
         if (savedAvatar) setVisitorAvatar(savedAvatar);
         if (savedConvoId) setCurrentConvoId(savedConvoId);
         setStep('chat');
-        startConversation({ name: savedName, email: savedEmail, avatar: savedAvatar || undefined })
-          .then(async (id) => {
-            setCurrentConvoId(id);
-            await new Promise(resolve => setTimeout(resolve, 800));
-            setIsChatReady(true);
-          });
+        // Removed redundant startConversation call here as handleStart manages the sequence
+      } else if (!isFreshLogin) {
+        // Ensure we always default to info step on fresh load
+        setStep('info');
+        setIsChatReady(false);
       }
     });
     return () => unsub();
@@ -137,6 +131,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
     setError(null);
 
     try {
+      console.log("Starting chat auth flow for:", email);
       // Mark session as active in this page load
       isFreshLogin = true;
       
@@ -149,31 +144,46 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
       localStorage.setItem('visitor_avatar', avatar);
       
       if (!auth.currentUser) {
+        console.log("Signing in as visitor anonymously...");
         await signInAsVisitor();
+        console.log("Sign-in successful, UID:", auth.currentUser?.uid);
+      } else {
+        console.log("Already signed in, UID:", auth.currentUser.uid);
       }
 
+      console.log("Establishing conversation record...");
       // Ensure conversation exists and get its stable ID
       const convoId = await startConversation({ 
         name: effectiveName, 
-        email: visitorEmail 
+        email: visitorEmail,
+        ip: visitorIp
       });
+      console.log("Conversation established with ID:", convoId);
       
       localStorage.setItem('visitor_convo_id', convoId);
       setCurrentConvoId(convoId);
       setVisitorAvatar(avatar);
       setVisitorName(effectiveName);
-      // Small delay for firestore rules propagation
-      await new Promise(r => setTimeout(r, 800));
+      // Robust delay for firestore rules propagation
+      console.log("Waiting for rules propagation...");
+      await new Promise(r => setTimeout(r, 1500));
       setIsChatReady(true);
       setStep('chat');
+      console.log("Chat setup complete.");
     } catch (err: any) {
-      console.error("Chat Auth Error:", err);
+      console.error("Chat Auth Error Detail:", {
+        code: err.code,
+        message: err.message,
+        stack: err.stack,
+        user: auth.currentUser?.uid
+      });
       if (err.code === 'auth/admin-restricted-operation') {
         setError("auth-disabled");
       } else if (err.code === 'auth/network-request-failed') {
         setError("Network error. Please check your internet connection.");
       } else {
-        setError("Something went wrong. Please check your Firebase console or try again.");
+        // Fallback to specific error message if available
+        setError(err.message || "Something went wrong. Please check your Firebase console or try again.");
       }
     }
   };
@@ -181,8 +191,8 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) {
-        setError("Image too large. Please use a small avatar (under 1MB).");
+      if (file.size > 100 * 1024) {
+        setError("Image too large. Please use a very small avatar (under 100KB).");
         return;
       }
       const reader = new FileReader();
@@ -204,21 +214,22 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
     const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
     
     await sendMessage(convoId, text, { 
-      id: user.uid, 
       name: visitorName || 'Guest',
+      email: visitorEmail,
+      ip: visitorIp,
       avatar: visitorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(visitorName || 'G')}&background=3b82f6&color=fff`
     });
   };
 
   const handleStartEdit = (msg: MessageType) => {
-    // Only allow editing own messages
-    if (msg.senderId !== user?.uid) return;
+    // Only allow editing own messages (by email)
+    if (msg.senderId !== visitorEmail) return;
     
     const created = msg.createdAt?.toMillis ? msg.createdAt.toMillis() : Date.now();
     const now = Date.now();
     
-    if (now - created > 5 * 60 * 1000) {
-      alert("You can only edit messages sent in the last 5 minutes.");
+    if (now - created > 10 * 60 * 1000) {
+      alert("You can only edit messages sent in the last 10 minutes.");
       return;
     }
     
@@ -233,6 +244,18 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
       await editMessage(convoId, editingMessageId, editInput.trim());
       setEditingMessageId(null);
       setEditInput('');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDelete = async (msgId: string, mode: 'everyone' | 'me') => {
+    const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+    if (!convoId) return;
+    
+    try {
+      await deleteMessage(convoId, msgId, mode);
+      setDeleteOptionsId(null);
     } catch (err: any) {
       alert(err.message);
     }
@@ -378,12 +401,14 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Say hello to start the conversation</p>
                   </div>
                 )}
-                {messages.map((msg, i) => (
+                {messages
+                  .filter(m => !m.deletedBy?.includes(visitorEmail))
+                  .map((msg, i) => (
                   <div 
                     key={msg.id || i} 
-                    className={`flex items-end gap-2 ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'} group`}
+                    className={`flex items-end gap-2 ${msg.senderId === visitorEmail ? 'justify-end' : 'justify-start'} group`}
                   >
-                    {msg.senderId !== user?.uid && (
+                    {msg.senderId !== visitorEmail && (
                       <div className="w-8 h-8 rounded-lg bg-slate-200 overflow-hidden shrink-0 border border-white shadow-sm self-start mt-2">
                         <img 
                           src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'A')}&background=0f172a&color=fff`} 
@@ -422,33 +447,85 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
                         </div>
                       ) : (
                         <div className={`relative px-4 py-2.5 text-sm font-medium shadow-sm transition-all group-hover:shadow-md ${
-                          msg.senderId === user?.uid 
+                          msg.isDeleted ? 'bg-slate-100 text-slate-400 italic' :
+                          msg.senderId === visitorEmail 
                             ? 'bg-primary text-white rounded-2xl rounded-tr-none' 
                             : 'bg-white border border-slate-200/60 text-slate-700 rounded-2xl rounded-tl-none'
                         }`}>
-                          <p className="leading-relaxed">{msg.text}</p>
-                          {msg.senderId === user?.uid && (
-                            <button 
-                              onClick={() => handleStartEdit(msg)}
-                              className="absolute -left-10 top-1/2 -translate-y-1/2 p-2 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:text-accent z-20"
-                            >
-                              <Pencil size={12} />
-                            </button>
+                          <p className="leading-relaxed">{msg.isDeleted ? "This message was deleted" : msg.text}</p>
+                          {!msg.isDeleted && (
+                            <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 ${
+                              msg.senderId === visitorEmail ? '-left-20' : '-right-10'
+                            }`}>
+                              {msg.senderId === visitorEmail && (
+                                <button 
+                                  onClick={() => handleStartEdit(msg)}
+                                  className="p-1.5 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm hover:text-accent"
+                                  title="Edit"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => setDeleteOptionsId(deleteOptionsId === msg.id ? null : msg.id!)}
+                                className="p-1.5 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm hover:text-red-500"
+                                title="Remove"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           )}
+
+                          {/* Delete Options Popover */}
+                          <AnimatePresence>
+                            {deleteOptionsId === msg.id && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                className={`absolute z-30 bg-white border border-slate-200 shadow-xl rounded-xl p-1.5 flex flex-col gap-1 min-w-[160px] ${
+                                  msg.senderId === visitorEmail ? 'right-0 top-full mt-2' : 'left-0 top-full mt-2'
+                                }`}
+                              >
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 py-1">Message Options</p>
+                                {msg.senderId === visitorEmail && (
+                                  <button
+                                    onClick={() => handleDelete(msg.id!, 'everyone')}
+                                    className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between"
+                                  >
+                                    Unsend for everyone
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDelete(msg.id!, 'me')}
+                                  className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
+                                >
+                                  Remove for you
+                                </button>
+                                <div className="h-px bg-slate-100 my-1" />
+                                <button
+                                  onClick={() => setDeleteOptionsId(null)}
+                                  className="w-full text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-lg transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                       
                       <div className={`text-[9px] mt-1.5 flex items-center gap-1.5 font-mono ${
-                        msg.senderId === user?.uid ? 'text-white/60' : 'text-slate-400'
+                        msg.senderId === visitorEmail ? 'text-white/60' : 'text-slate-400'
                       }`}>
                         {msg.isEdited && (
                           <span className="font-bold uppercase italic tracking-widest">Edited</span>
                         )}
                         {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
-                        {msg.senderId === user?.uid && <CheckCheck size={10} className="text-accent" />}
+                        {msg.senderId === visitorEmail && <CheckCheck size={10} className="text-accent" />}
                       </div>
                     </div>
-                    {msg.senderId === user?.uid && (
+                    {msg.senderId === visitorEmail && (
                       <div className="w-8 h-8 rounded-lg bg-accent/10 overflow-hidden shrink-0 border border-white shadow-sm self-end mb-2">
                         <img 
                           src={msg.senderAvatar || (visitorAvatar ? visitorAvatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(visitorName || 'G')}&background=3b82f6&color=fff`)} 

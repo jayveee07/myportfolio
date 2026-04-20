@@ -20,7 +20,10 @@ import {
   Send,
   User,
   Menu,
-  X
+  X,
+  Filter,
+  Search,
+  ChevronDown
 } from 'lucide-react';
 
 const Github = (props: any) => (
@@ -69,7 +72,8 @@ import {
   logOut,
   auth,
   testConnection,
-  signInAdmin
+  signInAdmin,
+  recordVisit
 } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ChatWidget } from './components/ChatWidget';
@@ -92,6 +96,8 @@ export default function App() {
   const [skills, setSkills] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [education, setEducation] = useState<any[]>([]);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -144,20 +150,31 @@ export default function App() {
     window.location.href = `mailto:${email}?subject=Hiring Inquiry - John Vince Paisan`;
   };
 
+  const allTech = Array.from(new Set(projects.flatMap(p => p.techStack || [])));
+  const allTags = Array.from(new Set(projects.flatMap(p => p.tags || [])));
+  const availableFilters = Array.from(new Set([...allTech, ...allTags])).sort() as string[];
+
+  const filteredProjects = selectedFilters.length === 0
+    ? projects
+    : projects.filter(p => 
+        selectedFilters.some(f => 
+          (p.techStack || []).includes(f) || (p.tags || []).includes(f)
+        )
+      );
+
+  const toggleFilter = (filter: string) => {
+    setSelectedFilters(prev => 
+      prev.includes(filter) 
+        ? prev.filter(f => f !== filter) 
+        : [...prev, filter]
+    );
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    
-    // Record visit on load
-    const trackEntry = async () => {
-      // Only track if not admin
-      const isAdminSession = localStorage.getItem('is_admin') === 'true';
-      if (!isAdminSession) {
-        const { recordVisit } = await import('./lib/firebase');
-        recordVisit(window.location.pathname);
-      }
+    const freshStart = async () => {
+      // Do not clear session clues on every load to allow session resumption
+      // Only clear if explicitly requested (not implemented currently)
     };
-    trackEntry();
-    
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -266,7 +283,27 @@ export default function App() {
       }
     };
 
-    fetchData();
+    const init = async () => {
+      await freshStart();
+      const trackEntry = async () => {
+        // Small delay to let freshStart finish propagating in Auth
+        await new Promise(r => setTimeout(r, 1000));
+        // Only track if not admin
+        const isAdminSession = localStorage.getItem('is_admin') === 'true';
+        if (!isAdminSession) {
+          recordVisit(window.location.pathname);
+        }
+      };
+      trackEntry();
+      fetchData();
+    };
+
+    init();
+
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+
     return () => unsubscribe();
   }, []);
 
@@ -566,8 +603,81 @@ export default function App() {
         {/* Projects Section */}
         <section id="projects" className="section-container">
           <SectionHeader title="Featured Projects" subtitle="Portfolio" />
+          
+          {/* Project Filters */}
+          <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-wrap gap-2">
+              {selectedFilters.map(f => (
+                <button
+                  key={f}
+                  onClick={() => toggleFilter(f)}
+                  className="group flex items-center gap-1.5 bg-accent text-white px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-accent/90"
+                >
+                  {f}
+                  <X size={12} className="opacity-60 group-hover:opacity-100" />
+                </button>
+              ))}
+              {selectedFilters.length > 0 && (
+                <button 
+                  onClick={() => setSelectedFilters([])}
+                  className="text-xs font-bold text-slate-400 hover:text-accent px-2"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                className="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-sm font-semibold text-primary hover:border-accent hover:text-accent transition-all shadow-sm"
+              >
+                <Filter size={16} />
+                Filter by Stack
+                <ChevronDown size={14} className={`transition-transform duration-300 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              <AnimatePresence>
+                {isFilterDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setIsFilterDropdownOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-20 p-4 scrollbar-hide"
+                    >
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-2">Technologies & Tags</div>
+                      <div className="grid grid-cols-1 gap-1">
+                        {availableFilters.map(filter => (
+                          <button
+                            key={filter}
+                            onClick={() => toggleFilter(filter)}
+                            className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                              selectedFilters.includes(filter) 
+                                ? 'bg-accent/5 text-accent' 
+                                : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {filter}
+                            {selectedFilters.includes(filter) && (
+                              <div className="w-1.5 h-1.5 bg-accent rounded-full" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-8">
-            {projects.map((project: any, index: number) => (
+            {filteredProjects.map((project: any, index: number) => (
               <motion.div 
                 key={index}
                 whileHover={{ y: -5 }}
@@ -587,6 +697,11 @@ export default function App() {
                     {project.techStack?.map((tech: string) => (
                       <span key={tech} className="text-[10px] font-bold text-accent px-2 py-0.5 bg-accent/5 rounded-full uppercase tracking-tighter">
                         {tech}
+                      </span>
+                    ))}
+                    {project.tags?.map((tag: string) => (
+                      <span key={tag} className="text-[10px] font-bold text-slate-500 px-2 py-0.5 bg-slate-100 rounded-full uppercase tracking-tighter">
+                        {tag}
                       </span>
                     ))}
                   </div>

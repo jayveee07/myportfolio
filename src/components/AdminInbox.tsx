@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Inbox, Search, MessageSquare, Send, User, Clock, ArrowLeft, Settings, MoreVertical, LogOut, Eye, Mail, Sparkles, Sparkle } from 'lucide-react';
+import { Inbox, Search, MessageSquare, Send, User, Clock, ArrowLeft, Settings, MoreVertical, LogOut, Eye, Mail, Sparkles, Sparkle, CheckCheck } from 'lucide-react';
 import { 
   subscribeToConversations, 
   subscribeToMessages, 
   sendMessage, 
-  markAsRead,
-  setAdminTypingStatus,
-  editMessage,
+  markAsRead, 
+  setAdminTypingStatus, 
+  editMessage, 
+  deleteMessage, 
   Conversation, 
-  Message 
+  Message,
+  ADMIN_EMAIL,
+  ADMIN_NAME
 } from '../lib/messaging';
 import { auth, logOut, db } from '../lib/firebase';
-import { Pencil, Save, X as CloseX } from 'lucide-react';
+import { Pencil, Save, X as CloseX, Trash2 } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, limit, where, getDocs } from 'firebase/firestore';
 import { suggestAdminResponse } from '../lib/gemini';
 
@@ -34,6 +37,7 @@ export const AdminInbox = ({ user }: { user: any }) => {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [deleteOptionsId, setDeleteOptionsId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -88,15 +92,15 @@ export const AdminInbox = ({ user }: { user: any }) => {
     setInput('');
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     setAdminTypingStatus(selectedConvo.id, false);
-    await sendMessage(selectedConvo.id, text, { id: 'admin', name: 'John Vince' }, true);
+    await sendMessage(selectedConvo.id, text, { email: ADMIN_EMAIL, name: ADMIN_NAME }, true);
   };
 
   const handleStartEdit = (msg: Message) => {
     const created = msg.createdAt?.toMillis ? msg.createdAt.toMillis() : Date.now();
     const now = Date.now();
     
-    if (now - created > 5 * 60 * 1000) {
-      alert("You can only edit messages sent in the last 5 minutes.");
+    if (now - created > 10 * 60 * 1000) {
+      alert("You can only edit messages sent in the last 10 minutes.");
       return;
     }
     
@@ -110,6 +114,17 @@ export const AdminInbox = ({ user }: { user: any }) => {
       await editMessage(selectedConvo.id, editingMessageId, editInput.trim());
       setEditingMessageId(null);
       setEditInput('');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDelete = async (msgId: string, mode: 'everyone' | 'me') => {
+    if (!selectedConvo) return;
+    
+    try {
+      await deleteMessage(selectedConvo.id, msgId, mode);
+      setDeleteOptionsId(null);
     } catch (err: any) {
       alert(err.message);
     }
@@ -222,9 +237,14 @@ export const AdminInbox = ({ user }: { user: any }) => {
                         </span>
                       ) : null}
                     </div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                      {convo.updatedAt?.toDate ? convo.updatedAt.toDate().toLocaleDateString() : '...'}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                        {convo.updatedAt?.toDate ? convo.updatedAt.toDate().toLocaleDateString() : '...'}
+                      </span>
+                      <span className="text-[8px] text-slate-300 font-black uppercase tracking-widest mt-0.5">
+                        {convo.visitorIp || 'No IP'}
+                      </span>
+                    </div>
                   </div>
                   <p className={`text-xs font-medium line-clamp-2 leading-relaxed ${convo.unreadCount ? 'text-slate-900 font-bold' : 'text-slate-500'}`}>
                     {convo.lastMessage || 'No messages yet'}
@@ -293,12 +313,17 @@ export const AdminInbox = ({ user }: { user: any }) => {
                 </div>
                 <div>
                   <h2 className="font-bold text-primary leading-none mb-1">{selectedConvo.visitorName || 'Guest Visitor'}</h2>
-                  <button 
-                    onClick={() => selectedConvo.visitorEmail && handleInspectVisitor(selectedConvo.visitorEmail)}
-                    className="text-[10px] text-accent hover:underline font-bold uppercase tracking-widest text-left"
-                  >
-                    {selectedConvo.visitorEmail || 'Unknown Email'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => selectedConvo.visitorEmail && handleInspectVisitor(selectedConvo.visitorEmail)}
+                      className="text-[10px] text-accent hover:underline font-bold uppercase tracking-widest text-left"
+                    >
+                      {selectedConvo.visitorEmail || 'Unknown Email'}
+                    </button>
+                    <span className="text-[8px] px-1.5 py-0.5 bg-slate-100 text-slate-400 font-bold rounded uppercase tracking-widest">
+                      IP: {selectedConvo.visitorIp || 'Unknown'}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -330,12 +355,14 @@ export const AdminInbox = ({ user }: { user: any }) => {
                 </span>
               </div>
 
-              {messages.map((msg, i) => (
+              {messages
+                .filter(m => !m.deletedBy?.includes(ADMIN_EMAIL))
+                .map((msg, i) => (
                 <div 
                   key={msg.id || i} 
-                  className={`flex ${msg.senderId === 'admin' ? 'justify-end' : 'justify-start'} group`}
+                  className={`flex ${msg.senderId === ADMIN_EMAIL ? 'justify-end' : 'justify-start'} group`}
                 >
-                  <div className={`flex flex-col ${msg.senderId === 'admin' ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                  <div className={`flex flex-col ${msg.senderId === ADMIN_EMAIL ? 'items-end' : 'items-start'} max-w-[70%]`}>
                     {editingMessageId === msg.id ? (
                       <div className="bg-white border border-accent p-2 rounded-2xl flex flex-col gap-2 w-full shadow-lg min-w-[200px]">
                         <textarea
@@ -361,19 +388,72 @@ export const AdminInbox = ({ user }: { user: any }) => {
                       </div>
                     ) : (
                       <div className={`relative px-5 py-3 rounded-2xl text-sm font-medium leading-relaxed shadow-sm transition-all ${
-                        msg.senderId === 'admin' 
+                        msg.isDeleted ? 'bg-slate-100 text-slate-400 italic' :
+                        msg.senderId === ADMIN_EMAIL 
                           ? 'bg-primary text-white rounded-tr-none' 
                           : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
                       }`}>
-                        <p>{msg.text}</p>
-                        {msg.senderId === 'admin' && (
-                          <button 
-                            onClick={() => handleStartEdit(msg)}
-                            className="absolute -left-10 top-1/2 -translate-y-1/2 p-2 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:text-accent z-20"
-                          >
-                            <Pencil size={14} />
-                          </button>
+                        <p>{msg.isDeleted ? "This message was deleted" : msg.text}</p>
+                        {!msg.isDeleted && (
+                          <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 ${
+                            msg.senderId === ADMIN_EMAIL ? '-left-24' : '-right-10'
+                          }`}>
+                            {msg.senderId === ADMIN_EMAIL && (
+                              <button 
+                                onClick={() => handleStartEdit(msg)}
+                                className="p-1.5 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm hover:text-accent"
+                                title="Edit"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => setDeleteOptionsId(deleteOptionsId === msg.id ? null : msg.id!)}
+                              className="p-1.5 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm hover:text-red-500"
+                              title="Remove"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         )}
+
+                        {/* Delete Options Popover */}
+                        <AnimatePresence>
+                          {deleteOptionsId === msg.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                              className={`absolute z-30 bg-white border border-slate-200 shadow-xl rounded-xl p-1.5 flex flex-col gap-1 min-w-[170px] ${
+                                msg.senderId === ADMIN_EMAIL ? 'right-0 top-full mt-2' : 'left-0 top-full mt-2'
+                              }`}
+                            >
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 py-1">Message Options</p>
+                              {msg.senderId === ADMIN_EMAIL && (
+                                <button
+                                  onClick={() => handleDelete(msg.id!, 'everyone')}
+                                  className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between"
+                                >
+                                  Unsend for everyone
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDelete(msg.id!, 'me')}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
+                                title="Remove from your view only"
+                              >
+                                Remove for you
+                              </button>
+                              <div className="h-px bg-slate-100 my-1" />
+                              <button
+                                onClick={() => setDeleteOptionsId(null)}
+                                className="w-full text-left px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-lg transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
                     <div className="mt-2 flex items-center gap-2">
@@ -383,6 +463,11 @@ export const AdminInbox = ({ user }: { user: any }) => {
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
                         {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
                       </span>
+                      {msg.senderId === ADMIN_EMAIL && (
+                        <div className="flex items-center gap-0.5">
+                           <CheckCheck size={10} className="text-accent" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

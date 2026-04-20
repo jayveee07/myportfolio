@@ -15,7 +15,9 @@ import {
   getDocs, 
   query, 
   orderBy, 
-  getDocFromServer 
+  getDocFromServer,
+  addDoc,
+  serverTimestamp
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
@@ -51,6 +53,26 @@ export const signInAdmin = (email: string, pass: string) => {
 
 export const signInAsVisitor = () => {
   return signInAnonymously(auth);
+};
+
+// Tracking visits
+export const recordVisit = async (path: string) => {
+  try {
+    const visitorId = localStorage.getItem('visitor_id') || Math.random().toString(36).substring(7);
+    localStorage.setItem('visitor_id', visitorId);
+    
+    const email = localStorage.getItem('visitor_email');
+    
+    await addDoc(collection(db, "visits"), {
+      visitorId,
+      email,
+      path,
+      userAgent: navigator.userAgent,
+      timestamp: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Failed to record visit:", err);
+  }
 };
 
 /**

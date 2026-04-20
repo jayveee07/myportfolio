@@ -81,6 +81,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["conversationId", "senderId", "text", "createdAt"]
+    },
+    "visit": {
+      "title": "Portfolio Visit",
+      "description": "Information about a visitor opening the portfolio.",
+      "type": "object",
+      "properties": {
+        "visitorId": { "type": "string" },
+        "email": { "type": "string" },
+        "ip": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "path": { "type": "string" }
+      },
+      "required": ["timestamp"]
     }
   },
   "firestore": {
@@ -107,6 +121,10 @@
     "conversations/{conversationId}/messages/{messageId}": {
       "schema": "message",
       "description": "Messages within a specific conversation."
+    },
+    "visits/{visitId}": {
+      "schema": "visit",
+      "description": "Record of portfolio visits."
     }
   }
 }

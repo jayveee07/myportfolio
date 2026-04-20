@@ -23,12 +23,21 @@ service cloud.firestore {
 
     function incoming() { return request.resource.data; }
 
+    function isValidId(id) { return id is string && id.size() <= 128; }
+
     // --- Validation Schemas ---
     function isValidMessage(data) {
       return data.keys().hasAll(['conversationId', 'text', 'senderId', 'senderName', 'createdAt']) &&
              data.text is string && data.text.size() <= 3000 &&
              data.senderId is string &&
              data.createdAt == request.time;
+    }
+
+    function isValidVisit(data) {
+      return data.keys().hasAll(['timestamp', 'path', 'visitorId']) &&
+             data.timestamp == request.time &&
+             data.path is string && data.path.size() <= 2048 &&
+             data.visitorId is string && data.visitorId.size() <= 128;
     }
 
     // --- Portfolio Rules (Public) ---
@@ -38,13 +47,19 @@ service cloud.firestore {
     match /projects/{id} { allow read: if true; allow write: if isAdmin(); }
     match /test/connection { allow read: if true; }
 
+    // --- Visitor Tracking ---
+    match /visits/{visitId} {
+      allow create: if isValidVisit(incoming()) && isValidId(visitId);
+      allow read, list: if isAdmin();
+      allow delete, update: if false;
+    }
+
     // --- Private Messaging ---
     match /conversations/{conversationId} {
       allow create: if isSignedIn();
-      allow list: if isAdmin();
-      // Allow get to check existence/metadata
-      allow get: if isSignedIn();
-      // Allow update if admin or adding oneself to participants
+      allow list, get: if isAdmin();
+      allow get: if isSignedIn() && (isAdmin() || request.auth.uid in resource.data.participants);
+      
       allow update: if isAdmin() || (isSignedIn() && (
         request.auth.uid in resource.data.participants || 
         (request.resource.data.participants.hasAll(resource.data.participants) && 
@@ -53,7 +68,12 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read, list, get: if isAdmin() || isParticipant(conversationId);
-        allow create: if (isAdmin() || isParticipant(conversationId)) && isValidMessage(incoming());
+        allow create: if (isAdmin() || isParticipant(conversationId)) && isValidMessage(incoming()) && isValidId(messageId);
+        allow update: if (isAdmin() || isParticipant(conversationId)) && (
+          // Admin can edit their own messages
+          (request.auth.uid == resource.data.senderId || isAdmin()) &&
+          incoming().diff(resource.data).affectedKeys().hasOnly(['text', 'isEdited'])
+        );
       }
     }
   }

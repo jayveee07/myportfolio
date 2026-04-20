@@ -6,11 +6,14 @@ import {
   subscribeToMessages, 
   startConversation, 
   subscribeToConversation,
+  editMessage,
+  setVisitorTypingStatus,
   Message as MessageType,
   Conversation
 } from '../lib/messaging';
 import { auth, signInAsVisitor } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Pencil } from 'lucide-react';
 
 interface ChatWidgetProps {
   isOpen: boolean;
@@ -33,8 +36,24 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
   const [step, setStep] = useState<'info' | 'chat'>('info');
   const [isChatReady, setIsChatReady] = useState(false);
   const [adminTyping, setAdminTyping] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editInput, setEditInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (input.trim() && currentConvoId) {
+      setVisitorTypingStatus(currentConvoId, true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        setVisitorTypingStatus(currentConvoId, false);
+      }, 3000);
+    }
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+  }, [input, currentConvoId]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -191,6 +210,34 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
     });
   };
 
+  const handleStartEdit = (msg: MessageType) => {
+    // Only allow editing own messages
+    if (msg.senderId !== user?.uid) return;
+    
+    const created = msg.createdAt?.toMillis ? msg.createdAt.toMillis() : Date.now();
+    const now = Date.now();
+    
+    if (now - created > 5 * 60 * 1000) {
+      alert("You can only edit messages sent in the last 5 minutes.");
+      return;
+    }
+    
+    setEditingMessageId(msg.id || null);
+    setEditInput(msg.text);
+  };
+
+  const handleSaveEdit = async () => {
+    const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+    if (!convoId || !editingMessageId || !editInput.trim()) return;
+    try {
+      await editMessage(convoId, editingMessageId, editInput.trim());
+      setEditingMessageId(null);
+      setEditInput('');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   return (
     <>
       <AnimatePresence>
@@ -333,8 +380,8 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
                 )}
                 {messages.map((msg, i) => (
                   <div 
-                    key={i} 
-                    className={`flex items-end gap-2 ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'}`}
+                    key={msg.id || i} 
+                    className={`flex items-end gap-2 ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'} group`}
                   >
                     {msg.senderId !== user?.uid && (
                       <div className="w-8 h-8 rounded-lg bg-slate-200 overflow-hidden shrink-0 border border-white shadow-sm self-start mt-2">
@@ -347,13 +394,56 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
                       </div>
                     )}
                     <div className={msg.senderId === user?.uid 
-                      ? 'bg-primary text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-sm font-medium shadow-sm active:scale-[0.98] transition-transform max-w-[80%]' 
-                      : 'bg-white border border-slate-200/60 text-slate-700 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm font-medium shadow-sm active:scale-[0.98] transition-transform max-w-[80%]'
+                      ? 'flex flex-col items-end max-w-[80%]' 
+                      : 'flex flex-col items-start max-w-[80%]'
                     }>
-                      <p className="leading-relaxed">{msg.text}</p>
+                      {editingMessageId === msg.id ? (
+                        <div className="bg-white border border-accent p-2 rounded-2xl flex flex-col gap-2 w-full shadow-lg min-w-[200px]">
+                          <textarea
+                            autoFocus
+                            value={editInput}
+                            onChange={(e) => setEditInput(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-0 font-medium resize-none min-h-[60px]"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => setEditingMessageId(null)}
+                              className="p-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              onClick={handleSaveEdit}
+                              className="p-1 px-3 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-widest"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`relative px-4 py-2.5 text-sm font-medium shadow-sm transition-all group-hover:shadow-md ${
+                          msg.senderId === user?.uid 
+                            ? 'bg-primary text-white rounded-2xl rounded-tr-none' 
+                            : 'bg-white border border-slate-200/60 text-slate-700 rounded-2xl rounded-tl-none'
+                        }`}>
+                          <p className="leading-relaxed">{msg.text}</p>
+                          {msg.senderId === user?.uid && (
+                            <button 
+                              onClick={() => handleStartEdit(msg)}
+                              className="absolute -left-10 top-1/2 -translate-y-1/2 p-2 bg-white text-slate-400 rounded-full border border-slate-100 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:text-accent z-20"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      
                       <div className={`text-[9px] mt-1.5 flex items-center gap-1.5 font-mono ${
                         msg.senderId === user?.uid ? 'text-white/60' : 'text-slate-400'
                       }`}>
+                        {msg.isEdited && (
+                          <span className="font-bold uppercase italic tracking-widest">Edited</span>
+                        )}
                         {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
                         {msg.senderId === user?.uid && <CheckCheck size={10} className="text-accent" />}
                       </div>

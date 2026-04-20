@@ -74,6 +74,7 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import { ChatWidget } from './components/ChatWidget';
 import { AdminInbox } from './components/AdminInbox';
+import { Logo } from './components/Logo';
 
 const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
   <div className="mb-12">
@@ -145,6 +146,17 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    
+    // Record visit on load
+    const trackEntry = async () => {
+      // Only track if not admin
+      const isAdminSession = localStorage.getItem('is_admin') === 'true';
+      if (!isAdminSession) {
+        const { recordVisit } = await import('./lib/firebase');
+        recordVisit(window.location.pathname);
+      }
+    };
+    trackEntry();
     
     const fetchData = async () => {
       try {
@@ -348,7 +360,7 @@ export default function App() {
       <nav className="nav-glass px-6 md:px-12">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <div className="bg-primary text-white p-2 rounded-lg font-bold text-lg select-none">VP</div>
+            <Logo size="md" />
             <div className="hidden lg:flex gap-8 font-medium text-sm text-slate-500">
               <a href="#about" className="hover:text-primary transition-colors">Overview</a>
               <a href="#experience" className="hover:text-primary transition-colors">Experience</a>
@@ -653,7 +665,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="flex flex-col md:flex-row justify-between items-start gap-12 pb-16">
             <div className="max-w-sm">
-              <div className="bg-primary text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg mb-6">VP</div>
+              <Logo size="md" className="mb-6" />
               <p className="text-slate-500 font-medium leading-relaxed font-sans">
                 Focused on developing high-performance, user-centric web applications and managing robust data operations.
               </p>

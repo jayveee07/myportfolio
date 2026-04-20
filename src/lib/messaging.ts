@@ -14,6 +14,7 @@ import {
   Timestamp 
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
+import { generateChatResponse } from "./gemini";
 
 export interface Message {
   id?: string;
@@ -22,6 +23,7 @@ export interface Message {
   senderName?: string;
   senderAvatar?: string;
   createdAt: any;
+  isEdited?: boolean;
 }
 
 export interface Conversation {
@@ -35,6 +37,7 @@ export interface Conversation {
   isAutoReplied?: boolean;
   unreadCount?: number;
   adminTyping?: boolean;
+  visitorTyping?: boolean;
 }
 
 const ADMIN_EMAIL = "jvpaisan@gmail.com";
@@ -81,12 +84,15 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
       const adminMsgSnap = await getDocs(adminMsgQuery);
 
       if (adminMsgSnap.empty) {
+        // Get AI generated response
+        const aiResponse = await generateChatResponse(text, visitorInfo.name);
+        
         // Create auto-reply message
         const autoReplyData = {
           conversationId,
-          text: "Thanks for reaching out! I've received your message and will get back to you shortly.",
+          text: aiResponse || "Thanks for reaching out! I've received your message and will get back to you shortly.",
           senderId: "admin",
-          senderName: ADMIN_NAME,
+          senderName: `${ADMIN_NAME} (AI)`,
           senderAvatar: ADMIN_AVATAR,
           createdAt: serverTimestamp(),
         };
@@ -146,6 +152,46 @@ export const setAdminTypingStatus = async (conversationId: string, isTyping: boo
   await updateDoc(convoRef, {
     adminTyping: isTyping
   });
+};
+
+export const setVisitorTypingStatus = async (conversationId: string, isTyping: boolean) => {
+  const convoRef = doc(db, "conversations", conversationId);
+  await updateDoc(convoRef, {
+    visitorTyping: isTyping
+  });
+};
+
+export const editMessage = async (conversationId: string, messageId: string, newText: string) => {
+  const msgRef = doc(db, `conversations/${conversationId}/messages`, messageId);
+  const msgSnap = await getDoc(msgRef);
+  
+  if (!msgSnap.exists()) return;
+  
+  const msgData = msgSnap.data() as Message;
+  const now = Timestamp.now().toMillis();
+  const created = msgData.createdAt?.toMillis() || now;
+  
+  // 5 minute window
+  if (now - created > 5 * 60 * 1000) {
+    throw new Error("Editing window expired (5 minutes).");
+  }
+  
+  await updateDoc(msgRef, {
+    text: newText,
+    isEdited: true
+  });
+  
+  // Also update last message in conversation if this was the latest message
+  const convoRef = doc(db, "conversations", conversationId);
+  const convoSnap = await getDoc(convoRef);
+  if (convoSnap.exists()) {
+    const convoData = convoSnap.data() as Conversation;
+    if (convoData.lastMessage === msgData.text) {
+      await updateDoc(convoRef, {
+        lastMessage: newText
+      });
+    }
+  }
 };
 
 export const subscribeToConversation = (conversationId: string, callback: (convo: Conversation) => void) => {

@@ -62,7 +62,6 @@ export const Logo = ({ size = 'md', className = '' }: LogoProps) => {
         whileHover={{ scale: 1.05, rotate: [0, -5, 5, 0] }}
         whileTap={{ scale: 0.95 }}
         className={`relative z-10 flex items-center justify-center rounded-xl overflow-hidden bg-primary shadow-lg shadow-primary/20 group ${sizes[size]}`}
-        title="Click to top | Shift + Click for Admin | Right click for options"
       >
         {/*
           User: Please replace '/logo.png' with the actual path to your logo file in the public folder.
@@ -84,13 +83,6 @@ export const Logo = ({ size = 'md', className = '' }: LogoProps) => {
         {/* Glow effect */}
         <div className="absolute inset-0 bg-accent/20 opacity-0 group-hover:opacity-100 transition-opacity blur-md" />
       </motion.button>
-
-      {/* Secret Admin Hint for Hover */}
-      <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap bg-white px-2 py-1 rounded-full border border-slate-100 shadow-sm">
-           Shift+Click for Admin
-         </span>
-      </div>
 
       <AnimatePresence>
         {showMenu && (

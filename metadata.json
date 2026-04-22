@@ -1,6 +1,6 @@
 {
   "name": "MyPortfolio",
-  "description": "A modern, high-performance portfolio with Firebase integration for projects and user data.",
+  "description": "A feature-rich personal portfolio featuring real-time chat with AI auto-replies, dynamic project filtering, and visitor tracking.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

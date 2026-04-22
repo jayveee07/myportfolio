@@ -14,7 +14,7 @@ import {
   updateDoc,
   Timestamp 
 } from "firebase/firestore";
-import { db, auth } from "./firebase";
+import { db, auth, FirestoreErrorInfo, handleFirestoreError } from "./firebase";
 import { generateChatResponse } from "./gemini";
 
 export interface Message {
@@ -38,12 +38,14 @@ export interface Conversation {
   visitorName?: string;
   visitorEmail?: string;
   visitorAvatar?: string;
-  visitorUid?: string;
+  visitorId?: string;
   visitorIp?: string;
   isAutoReplied?: boolean;
   unreadCount?: number;
   adminTyping?: boolean;
   visitorTyping?: boolean;
+  isPinned?: boolean;
+  isBlocked?: boolean;
 }
 
 export const ADMIN_EMAIL = "jvpaisan@gmail.com";
@@ -70,7 +72,11 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
   const convoRef = doc(db, "conversations", conversationId);
   const messagesRef = collection(db, `conversations/${conversationId}/messages`);
   
-  await addDoc(messagesRef, messageData);
+  try {
+    await addDoc(messagesRef, messageData);
+  } catch (err: any) {
+    handleFirestoreError(err, 'create', messagesRef.path);
+  }
   
   const updateData: any = {
     lastMessage: text,
@@ -79,6 +85,7 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
 
   // Handle Auto-reply logic for visitors
   if (!isAdminReply) {
+  try {
     const convoSnap = await getDoc(convoRef);
     const convoData = convoSnap.data() as Conversation;
 
@@ -87,7 +94,7 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
 
     // Only auto-reply if not already replied AND if admin hasn't sent any messages yet
     if (!convoData?.isAutoReplied) {
-      const adminMsgQuery = query(messagesRef, where("senderId", "==", "admin"));
+      const adminMsgQuery = query(messagesRef, where("senderId", "==", ADMIN_EMAIL));
       const adminMsgSnap = await getDocs(adminMsgQuery);
 
       if (adminMsgSnap.empty) {
@@ -98,7 +105,7 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
         const autoReplyData = {
           conversationId,
           text: aiResponse || "Thanks for reaching out! I've received your message and will get back to you shortly.",
-          senderId: "admin",
+          senderId: ADMIN_EMAIL,
           senderName: `${ADMIN_NAME} (AI)`,
           senderAvatar: ADMIN_AVATAR,
           createdAt: serverTimestamp(),
@@ -110,12 +117,20 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
         updateData.isAutoReplied = true;
       }
     }
+  } catch (err: any) {
+    console.warn("Auto-reply logic failed (likely permission):", err.message);
+    // Silent fail for auto-reply logic, it's non-critical
+  }
   } else {
     updateData.unreadCount = 0;
     updateData.isAutoReplied = true;
   }
 
-  await updateDoc(convoRef, updateData);
+  try {
+    await updateDoc(convoRef, updateData);
+  } catch (err: any) {
+    handleFirestoreError(err, 'update', convoRef.path);
+  }
 };
 
 export const startConversation = async (visitorInfo: { name: string, email: string, avatar?: string, ip?: string }) => {
@@ -147,19 +162,20 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
       convoSnap = await getDoc(convoRef);
       break; 
     } catch (err: any) {
-      if ((err.code === 'permission-denied' || err.code === 'unauthenticated') && retryCount < maxRetries - 1) {
-        console.warn(`Retry ${retryCount + 1}/${maxRetries} on convo fetch [${convoRef.path}]: ${err.message}`);
-        await new Promise(r => setTimeout(r, 800)); 
-        retryCount++;
-      } else {
-        if (err.code === 'permission-denied') {
-          console.error("Critical Permission Denied on conversation:", {
-            path: convoRef.path,
-            uid: auth.currentUser?.uid,
-            authReady: !!auth.currentUser
-          });
+      if ((err.code === 'permission-denied' || err.code === 'unauthenticated')) {
+        if (retryCount < maxRetries - 1) {
+          console.warn(`Retry ${retryCount + 1}/${maxRetries} on convo fetch [${convoRef.path}]: ${err.message}`);
+          await new Promise(r => setTimeout(r, 800)); 
+          retryCount++;
+        } else {
+          // If all retries fail, it might be an uninitialized convo for an anonymous user
+          // Try to proceed without the snap and let setDoc/updateDoc handle it
+          console.warn("Convo fetch failed on final retry. Proceeding to attempt creation.");
+          convoSnap = { exists: () => false } as any; 
+          break;
         }
-        throw err;
+      } else {
+        handleFirestoreError(err, 'get', convoRef.path);
       }
     }
   }
@@ -167,8 +183,6 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
   if (!convoSnap) {
     throw new Error("Unable to establish connection to chat server. Please try again in a moment.");
   }
-
-  const currentUid = auth.currentUser.uid;
 
   if (!convoSnap.exists()) {
     const avatarToSave = visitorInfo.avatar && visitorInfo.avatar.length > 100000 ? null : visitorInfo.avatar;
@@ -179,7 +193,8 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
       try {
         await setDoc(convoRef, {
           participants: [visitorInfo.email.toLowerCase(), ADMIN_EMAIL],
-          visitorUid: currentUid || "anonymous",
+          visitorUid: auth.currentUser.uid,
+          visitorId: visitorInfo.email.toLowerCase(),
           visitorIp: visitorInfo.ip || 'unknown',
           visitorName: visitorInfo.name,
           visitorEmail: visitorInfo.email.toLowerCase(),
@@ -195,7 +210,7 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
           await new Promise(r => setTimeout(r, 1000));
           writeRetry++;
         } else {
-          throw err;
+          handleFirestoreError(err, 'create', convoRef.path);
         }
       }
     }
@@ -205,11 +220,11 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
       updatePayload.visitorAvatar = visitorInfo.avatar.length > 100000 ? null : visitorInfo.avatar;
     }
     if (visitorInfo.ip) updatePayload.visitorIp = visitorInfo.ip;
+    updatePayload.visitorUid = auth.currentUser.uid;
     
-    // Update visitorUid to current one if they are resuming session 
-    if (currentUid) {
-      updatePayload.visitorUid = currentUid;
-    }
+    // Identified by email
+    updatePayload.visitorId = visitorInfo.email.toLowerCase();
+    updatePayload.visitorEmail = visitorInfo.email.toLowerCase();
     
     if (Object.keys(updatePayload).length > 0) {
       let updateSuccess = false;
@@ -224,7 +239,7 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
             await new Promise(r => setTimeout(r, 1000));
             updateRetry++;
           } else {
-            throw err;
+            handleFirestoreError(err, 'update', convoRef.path);
           }
         }
       }
@@ -343,6 +358,16 @@ export const markAsRead = async (conversationId: string) => {
   });
 };
 
+export const markAllAsRead = async () => {
+  if (auth.currentUser?.email !== ADMIN_EMAIL) return;
+  
+  const q = query(collection(db, "conversations"), where("unreadCount", ">", 0));
+  const snap = await getDocs(q);
+  
+  const promises = snap.docs.map(d => updateDoc(d.ref, { unreadCount: 0 }));
+  await Promise.all(promises);
+};
+
 export const subscribeToMessages = (conversationId: string, callback: (messages: Message[]) => void) => {
   if (!conversationId) {
     console.warn("Attempted to subscribe to messages without a valid conversationId");
@@ -372,7 +397,7 @@ export const subscribeToConversations = (callback: (conversations: Conversation[
   // Guard: Only Admin can subscribe to all conversations
   const isAdmin = () => {
     const u = auth.currentUser;
-    return u && u.email === "jvpaisan@gmail.com";
+    return u && (u.email === "jvpaisan@gmail.com" || u.uid === "IrWAuYlvLkOSBOIljYrxXP7dVye2");
   };
 
   if (!isAdmin()) {
@@ -397,4 +422,66 @@ export const subscribeToConversations = (callback: (conversations: Conversation[
       console.error("Snapshot Listener Error (Conversations):", error.message);
     }
   );
+};
+
+export const togglePin = async (conversationId: string, isPinned: boolean) => {
+  await updateDoc(doc(db, "conversations", conversationId), {
+    isPinned: !isPinned
+  });
+};
+
+export const toggleBlock = async (conversationId: string, isBlocked: boolean) => {
+  await updateDoc(doc(db, "conversations", conversationId), {
+    isBlocked: !isBlocked
+  });
+};
+
+export interface AdminSettings {
+  autoReplyEnabled: boolean;
+  notificationSounds: boolean;
+  onlineStatus: 'online' | 'busy' | 'offline';
+  onlineHours?: string;
+}
+
+export const subscribeToAdminSettings = (callback: (settings: AdminSettings) => void) => {
+  return onSnapshot(doc(db, "settings", "chat"), (snap) => {
+    if (snap.exists()) {
+      callback(snap.data() as AdminSettings);
+    } else {
+      // Default settings
+      callback({
+        autoReplyEnabled: true,
+        notificationSounds: true,
+        onlineStatus: 'online'
+      });
+    }
+  });
+};
+
+export const updateAdminSettings = async (settings: Partial<AdminSettings>) => {
+  await setDoc(doc(db, "settings", "chat"), settings, { merge: true });
+};
+
+export const exportConversation = async (conversation: Conversation, messages: Message[]) => {
+  const content = {
+    conversationInfo: {
+      id: conversation.id,
+      visitor: conversation.visitorName,
+      email: conversation.visitorEmail,
+      startedAt: messages[0]?.createdAt?.toDate?.()?.toISOString?.() || 'Unknown'
+    },
+    messages: messages.map(m => ({
+      sender: m.senderName,
+      text: m.text,
+      time: m.createdAt?.toDate?.()?.toISOString?.() || 'Wait...'
+    }))
+  };
+
+  const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chat_export_${conversation.visitorName || conversation.id}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };

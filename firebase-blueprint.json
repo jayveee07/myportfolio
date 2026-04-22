@@ -63,11 +63,28 @@
         "updatedAt": { "type": "string", "format": "date-time" },
         "visitorName": { "type": "string" },
         "visitorEmail": { "type": "string" },
+        "visitorAvatar": { "type": "string" },
+        "visitorUid": { "type": "string" },
+        "visitorId": { "type": "string" },
+        "visitorIp": { "type": "string" },
         "unreadCount": { "type": "number" },
         "isAutoReplied": { "type": "boolean" },
-        "adminTyping": { "type": "boolean" }
+        "adminTyping": { "type": "boolean" },
+        "isPinned": { "type": "boolean" },
+        "isBlocked": { "type": "boolean" }
       },
       "required": ["participants", "updatedAt"]
+    },
+    "adminSettings": {
+      "title": "Admin Settings",
+      "description": "Global chat and application settings.",
+      "type": "object",
+      "properties": {
+        "autoReplyEnabled": { "type": "boolean" },
+        "notificationSounds": { "type": "boolean" },
+        "onlineStatus": { "type": "string", "enum": ["online", "busy", "offline"] },
+        "onlineHours": { "type": "string" }
+      }
     },
     "message": {
       "title": "Message",
@@ -77,6 +94,8 @@
         "conversationId": { "type": "string" },
         "senderId": { "type": "string" },
         "senderName": { "type": "string" },
+        "senderAvatar": { "type": "string" },
+        "senderIp": { "type": "string" },
         "text": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -113,6 +132,10 @@
     "projects/{projectId}": {
       "schema": "project",
       "description": "Collection of portfolio projects."
+    },
+    "settings/chat": {
+      "schema": "adminSettings",
+      "description": "Global admin preferences for chat."
     },
     "conversations/{conversationId}": {
       "schema": "conversation",

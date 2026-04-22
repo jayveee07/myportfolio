@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getUserProfile, getExperience, getSkills, getProjects } from "./firebase";
+import { ADMIN_EMAIL } from "./messaging";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -90,7 +91,7 @@ export async function suggestAdminResponse(messages: any[], visitorName: string)
       - Keep it brief.
     `;
 
-    const chatHistory = messages.map(m => `${m.senderName || (m.senderId === 'admin' ? 'John Vince' : 'Visitor')}: ${m.text}`).join("\n");
+    const chatHistory = messages.map(m => `${m.senderName || (m.senderId === ADMIN_EMAIL ? 'John Vince' : 'Visitor')}: ${m.text}`).join("\n");
 
     const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

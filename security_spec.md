@@ -1,26 +1,41 @@
-# Security Specification: Pro Portfolio Hub
+# Firestore Security Specification - Strategic Systems Portfolio
 
-## Data Invariants
-1. **Portfolio Content Integrity**: Experience, Skills, and Projects can only be created or modified by the Admin identified by email `jvpaisan@gmail.com`.
-2. **Conversation Isolation**: Visitors can only see and send messages to their own unique conversation document.
-3. **Admin Omniscience**: The Admin has full read/write access to all conversations and messages to facilitate customer support.
-4. **ID Hardening**: All document IDs must be valid alphanumeric strings to prevent injection attacks.
-5. **No Self-Privileging**: Field `senderId` in messages must match the authenticated `request.auth.uid`.
+## 1. Data Invariants
+- **Public Content**: `userProfile`, `experience`, `skills`, `projects`, and chat settings are publicly readable.
+- **Admin Control**: Only the authenticated admin (`jvpaisan@gmail.com`) can modify public content and manage conversations.
+- **Visitor Interactions**:
+    - Visitors must be authenticated (anonymously or via Google) to record visits or start chats.
+    - Visit IDs are derived from Email or IP to prevent duplicate tracking, but writes require an active auth session.
+    - Conversations are strictly between a visitor and the admin.
+    - Visitors can only access conversations identifying them (ID prefix `vst_`).
+    - Messages are immutable after 10 minutes and can only be edited by the sender.
+    - Blocked conversations prevent subsequent message writes.
 
-## The "Dirty Dozen" Payloads (Denial Tests)
-1. **Identity Spoofing**: Attempting to create a message with `senderId` of the admin as a visitor.
-2. **State Shortcutting**: Attempting to update a conversation's `unreadCount` to 0 as a visitor.
-3. **Portfolio Vandalism**: Attempting to delete a work experience item without being logged in as admin.
-4. **Ghost Field Injection**: Adding `isPromoted: true` to a project document update.
-5. **Resource Poisoning**: Using a 1MB string as a Skill category name to cause denial of wallet.
-6. **Cross-User Snooping**: Attempting to `get` a message subcollection of another visitor's UID.
-7. **Identity Poisoning**: Using a document ID with special characters like `../root` to attempt path traversal.
-8. **Orphaned Message**: Trying to send a message to a conversation ID that doesn't exist in the parent collection.
-9. **Role Escalation**: Trying to create an `admins` document for themselves.
-10. **Terminal State Break**: Attempting to edit a message text after it has been sent.
-11. **Spoofed Metadata**: Sending a `createdAt` timestamp from the client that is 10 years in the future.
-12. **Public PII Leak**: Attempting to `list` all user profiles to harvest emails without being the admin.
+## 2. The "Dirty Dozen" Payloads
 
-## Performance & Cost Guard
-- No `get()` lookups inside `allow list` blocks.
-- Mandatory `limit` and `where` clause enforcement on all private data queries.
+### Identity & Spoofing
+1. **Shadow Admin**: Attempt to write to `projects/` as an anonymous user.
+2. **Conversation Hijack**: Authorized user `UserA` attempting to read `conversations/vst_UserB`.
+3. **Visit Cloaking**: Attempt to create a visit record with a mismatching `visitorId` field.
+4. **Message Forgery**: Anonymous user `UserA` attempting to set `senderId: "admin"` on a new message.
+
+### Integrity & Validation
+5. **Junk ID Poisoning**: Create `conversations/` with a 2MB string as the ID.
+6. **Shadow Update**: Add `isVerified: true` to a message payload (field not in schema).
+7. **Temporal Fraud**: Set `createdAt` to a future date instead of `serverTimestamp()`.
+8. **Resource Exhaustion**: Send a 1MB string in the `visitorName` field.
+
+### State & Lifecycle
+9. **Terminal Breach**: Modify a message after the 10-minute lock window.
+10. **Blocked Bypass**: Send a message to a conversation where `isBlocked: true`.
+11. **Immutability Breach**: Change the `senderId` of an existing message via update.
+12. **Relationship Orphan**: Create a message in a non-existent conversation folder.
+
+## 3. Test Runner Definition (Verification Plan)
+The following behaviors must be verified:
+- `get` on `userProfile/main` returns 200 for everyone.
+- `create` on `visits/vst_test` returns 200 for `isSignedIn()`.
+- `create` on `conversations/vst_test` returns 200 for `isSignedIn()`.
+- `update` on `conversations/vst_test` where `isBlocked: true` returns 403.
+- `update` on `messages/msg_test` after 11 minutes returns 403.
+- `create` on any collection with extra fields (Shadow Update) returns 403.

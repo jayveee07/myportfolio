@@ -114,6 +114,18 @@
         "path": { "type": "string" }
       },
       "required": ["timestamp"]
+    },
+    "visitorRecord": {
+      "title": "Visitor Identity Record",
+      "description": "Links a visitor email to their current Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "uid"]
     }
   },
   "firestore": {
@@ -148,6 +160,10 @@
     "visits/{visitId}": {
       "schema": "visit",
       "description": "Record of portfolio visits."
+    },
+    "users/{email}": {
+      "schema": "visitorRecord",
+      "description": "Mapping of visitor emails to their current anonymous authentication UIDs."
     }
   }
 }

@@ -4,18 +4,18 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // --- Global Safety Net ---
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // match /{document=**} {
+    //   allow read, write: if false;
+    // }
 
     // --- Helpers ---
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.uid != null;
     }
     
     function isAdmin() {
       return isSignedIn() && (
-        (request.auth.token != null && request.auth.token.get('email', '') == "jvpaisan@gmail.com") ||
+        request.auth.token.get('email', '') == "jvpaisan@gmail.com" ||
         request.auth.uid == "IrWAuYlvLkOSBOIljYrxXP7dVye2"
       );
     }
@@ -33,45 +33,29 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 256 && id.matches('^[a-zA-Z0-9_.@\\-:\\s]+$');
+      return id is string && id.size() <= 256 && id.matches('^[a-zA-Z0-9_.@\\s\\-:_]+$');
     }
 
     // --- Entity Validations ---
 
     function isValidVisit(data) {
-      return data.timestamp == request.time &&
-             data.lastActive == request.time &&
-             data.visitorId is string &&
-             data.visitorId.size() <= 500 &&
-             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 500)) &&
-             (!('ip' in data) || data.ip is string) &&
-             (!('path' in data) || data.path is string) &&
-             (!('userAgent' in data) || data.userAgent is string);
+      return data.get('visitorId', '') is string &&
+             data.get('visitorId', '').size() <= 500;
     }
 
     function isValidConversation(data) {
-      return data.get('participants', []) is list &&
-             data.get('participants', []).size() >= 2 &&
-             data.updatedAt == request.time &&
-             data.get('visitorEmail', '') is string &&
-             data.get('visitorName', '') is string &&
-             data.get('visitorUid', '') == request.auth.uid &&
-             data.get('visitorId', '') is string &&
-             data.get('unreadCount', 0) is number &&
-             (!('isAutoReplied' in data) || data.isAutoReplied is bool) &&
-             (!('visitorAvatar' in data) || data.visitorAvatar == null || data.visitorAvatar is string) &&
-             (!('visitorIp' in data) || data.visitorIp is string);
+      return (data.get('visitorEmail', '') is string || !('visitorEmail' in data));
     }
 
     function isValidMessage(data) {
       return data.get('text', '') is string &&
              data.get('text', '').size() > 0 &&
-             data.createdAt == request.time &&
-             data.get('senderId', '') is string &&
-             data.get('senderName', '') is string &&
-             (!('conversationId' in data) || data.conversationId is string) &&
-             (!('senderAvatar' in data) || data.senderAvatar == null || data.senderAvatar is string) &&
-             (!('senderIp' in data) || data.senderIp is string);
+             data.get('senderId', '') is string;
+    }
+
+    // Health Check / Test Connection
+    match /test/connection {
+      allow get: if true;
     }
 
     // --- Collections ---
@@ -104,76 +88,39 @@ service cloud.firestore {
 
     // Visits
     match /visits/{visitId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && isValidVisit(incoming()) && isValidId(visitId);
-      allow update: if (isAdmin() || isSignedIn()) && 
-                    incoming().lastActive == request.time && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['lastActive', 'path', 'visitorId', 'ip', 'userAgent']);
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(visitId);
+      allow update: if isSignedIn() && isValidId(visitId);
     }
 
     // Conversations
     match /conversations/{conversationId} {
-      allow list: if isAdmin() || (isSignedIn() && resource.data.get('visitorUid', '') == request.auth.uid);
-      allow get: if isAdmin() || (isSignedIn() && (conversationId.startsWith('vst_') || resource.data.get('visitorUid', '') == request.auth.uid));
-      
-      allow create: if isSignedIn() && 
-                    conversationId.startsWith('vst_') && 
-                    isValidId(conversationId) && 
-                    isValidConversation(incoming());
-                    
-      allow update: if isAdmin() || (
-        isSignedIn() && 
-        conversationId.startsWith('vst_') && 
-        (
-          resource.data.get('visitorUid', '') == request.auth.uid || 
-          (incoming().get('visitorUid', '') == request.auth.uid && incoming().get('visitorEmail', '') == existing().get('visitorEmail', ''))
-        ) &&
-        !resource.data.get('isBlocked', false) &&
-        (
-          // Action: Heartbeat/Typing/Metadata
-          incoming().diff(existing()).affectedKeys().hasOnly(['visitorTyping', 'updatedAt', 'visitorIp', 'visitorUid', 'visitorId', 'visitorAvatar', 'lastMessage', 'unreadCount', 'isAutoReplied', 'visitorEmail'])
-        )
-      );
+      allow read: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
+      allow create: if isSignedIn() && conversationId.startsWith('vst_');
+      allow update: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
+      allow delete: if isAdmin();
 
       // Messages Subcollection
       match /messages/{messageId} {
-        function getConvo() {
-          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
-        }
-
-        allow list: if isAdmin() || (isSignedIn() && conversationId.startsWith('vst_'));
-        allow get: if isAdmin() || (isSignedIn() && conversationId.startsWith('vst_'));
-        
-        allow create: if isSignedIn() && 
-                      isValidMessage(incoming()) && 
-                      (isAdmin() || (
-                        conversationId.startsWith('vst_') && 
-                        !getConvo().get('isBlocked', false) &&
-                        (
-                          getConvo().get('visitorUid', '') == request.auth.uid ||
-                          // Allow creation if they match the email, to handle the identity transition race
-                          incoming().get('senderId', '') == getConvo().get('visitorEmail', '')
-                        )
-                      ));
-        
-        allow update: if isAdmin() || (
-          isSignedIn() && 
-          conversationId.startsWith('vst_') &&
-          getConvo().get('visitorUid', '') == request.auth.uid &&
-          existing().senderId != "admin" &&
-          !getConvo().get('isBlocked', false) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['text', 'isEdited', 'deletedBy']) &&
-          (request.time.toMillis() - existing().createdAt.toMillis() < 10 * 60 * 1000)
-        );
-        
-        allow delete: if isAdmin() || (
-          isSignedIn() && 
-          conversationId.startsWith('vst_') && 
-          (getConvo().get('visitorUid', '') == request.auth.uid) &&
-          existing().senderId != "admin"
-        );
+        allow read: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
+        allow create: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
+        allow update: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
+        allow delete: if isAdmin();
       }
+    }
+
+    // Visitor Identity Records (Syncing Email to UID)
+    match /users/{email} {
+      function isValidVisitorRecord(data) {
+        return (data.get('email', '') is string || !('email' in data)) && 
+               data.uid is string && 
+               data.uid == request.auth.uid;
+      }
+      
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(email) && isValidVisitorRecord(incoming()) && incoming().email == email;
+      allow update: if isSignedIn() && isValidId(email) && isValidVisitorRecord(incoming());
+      allow list: if isAdmin();
     }
   }
 }

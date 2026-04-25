@@ -23,7 +23,8 @@ import {
   serverTimestamp,
   onSnapshot,
   where,
-  Timestamp
+  Timestamp,
+  initializeFirestore
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
@@ -31,8 +32,10 @@ import { getVisitorIp } from "./ipService";
 
 const app = initializeApp(firebaseConfig);
 
-// Use getFirestore as recommended by system instructions for AI Studio
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || "(default)");
+// Use initializeFirestore with long polling to avoid connection issues in some environments
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, (firebaseConfig as any).firestoreDatabaseId || "(default)");
 
 export const auth = getAuth(app);
 
@@ -169,8 +172,15 @@ export const recordVisit = async (path: string) => {
       console.warn("recordVisit: Proceeding without auth context");
     }
 
-    // Rules engine propagation buffer
-    await new Promise(r => setTimeout(r, 800));
+    // Rules engine propagation buffer - slightly longer to ensure token availability
+    await new Promise(r => setTimeout(r, 1200));
+
+    const currentUser = auth.currentUser;
+    console.log("recordVisit: Handshaking with session", {
+      uid: currentUser?.uid,
+      isAnonymous: currentUser?.isAnonymous,
+      email: currentUser?.email
+    });
 
     const email = localStorage.getItem('visitor_email');
     const ip = await getVisitorIp();
@@ -252,6 +262,38 @@ export const subscribeToActiveVisitors = (callback: (count: number) => void) => 
   return onSnapshot(q, (snap) => {
     callback(snap.size);
   });
+};
+
+/**
+ * Synchronizes the visitor's email with their current anonymous UID.
+ * This implements the requested logic:
+ * 1. Check if user exists in 'users' collection by email (primary key).
+ * 2. If exists, update with current UID.
+ * 3. If not, create associated with current anonymous UID.
+ */
+export const syncVisitorIdentity = async (email: string) => {
+  if (!email || !auth.currentUser) return;
+  
+  const userRef = doc(db, "users", email.toLowerCase().trim());
+  const userSnap = await getDoc(userRef);
+  
+  if (userSnap.exists()) {
+    const data = userSnap.data();
+    console.log(`syncVisitorIdentity: Existing visitor found. Migrating identity from ${data.uid} to ${auth.currentUser.uid}`);
+    
+    await updateDoc(userRef, {
+      uid: auth.currentUser.uid,
+      lastActive: serverTimestamp()
+    });
+  } else {
+    console.log(`syncVisitorIdentity: New visitor. Creating record for ${email} with UID ${auth.currentUser.uid}`);
+    await setDoc(userRef, {
+      email: email.toLowerCase().trim(),
+      uid: auth.currentUser.uid,
+      createdAt: serverTimestamp(),
+      lastActive: serverTimestamp()
+    });
+  }
 };
 
 /**

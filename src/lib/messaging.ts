@@ -12,9 +12,10 @@ import {
   getDocFromServer,
   getDocs,
   updateDoc,
-  Timestamp 
+  Timestamp,
+  arrayUnion
 } from "firebase/firestore";
-import { db, auth, FirestoreErrorInfo, handleFirestoreError } from "./firebase";
+import { db, auth, FirestoreErrorInfo, handleFirestoreError, syncVisitorIdentity } from "./firebase";
 import { generateChatResponse } from "./gemini";
 
 export interface Message {
@@ -134,6 +135,12 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
 };
 
 export const startConversation = async (visitorInfo: { name: string, email: string, avatar?: string, ip?: string }) => {
+  // Ensure the visitor identity is synced in the 'users' collection first
+  await syncVisitorIdentity(visitorInfo.email);
+
+  // Buffer for rules propagation of the new identity link
+  await new Promise(r => setTimeout(r, 800));
+
   // Wait for auth to be fully established in the Firestore SDK
   let attempts = 0;
   while (!auth.currentUser && attempts < 10) {
@@ -191,8 +198,8 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
     let writeRetry = 0;
     while (!writeSuccess && writeRetry < 3) {
       try {
-        await setDoc(convoRef, {
-          participants: [visitorInfo.email.toLowerCase(), ADMIN_EMAIL],
+        const payload = {
+          participants: [visitorInfo.email.toLowerCase(), ADMIN_EMAIL, auth.currentUser.uid],
           visitorUid: auth.currentUser.uid,
           visitorId: visitorInfo.email.toLowerCase(),
           visitorIp: visitorInfo.ip || 'unknown',
@@ -202,7 +209,9 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
           updatedAt: serverTimestamp(),
           unreadCount: 0,
           isAutoReplied: false,
-        });
+        };
+        console.log("startConversation: Attempting setDoc with payload", payload);
+        await setDoc(convoRef, payload);
         writeSuccess = true;
       } catch (err: any) {
         if (err.code === 'permission-denied' && writeRetry < 2) {
@@ -210,6 +219,7 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
           await new Promise(r => setTimeout(r, 1000));
           writeRetry++;
         } else {
+          console.error("Critical setDoc failure in startConversation:", err.message);
           handleFirestoreError(err, 'create', convoRef.path);
         }
       }
@@ -221,6 +231,7 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
     }
     if (visitorInfo.ip) updatePayload.visitorIp = visitorInfo.ip;
     updatePayload.visitorUid = auth.currentUser.uid;
+    updatePayload.participants = arrayUnion(auth.currentUser.uid);
     
     // Identified by email
     updatePayload.visitorId = visitorInfo.email.toLowerCase();

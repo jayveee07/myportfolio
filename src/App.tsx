@@ -843,12 +843,12 @@ export default function App() {
                          <h3 className="text-4xl font-display font-bold text-primary tracking-tight uppercase group-hover:text-accent transition-colors duration-500">{project.title}</h3>
                          <div className="flex gap-2">
                             {project.link && (
-                              <a href={project.link} className="w-12 h-12 border border-line rounded-2xl flex items-center justify-center text-slate-400 hover:text-accent hover:border-accent hover:bg-accent/5 transition-all duration-300">
+                              <a href={project.link} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-line rounded-2xl flex items-center justify-center text-slate-400 hover:text-accent hover:border-accent hover:bg-accent/5 transition-all duration-300">
                                 <ExternalLink size={20} />
                               </a>
                             )}
                             {project.github && (
-                              <a href={project.github} className="w-12 h-12 border border-line rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary hover:bg-slate-50 transition-all duration-300">
+                              <a href={project.github} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-line rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary hover:bg-slate-50 transition-all duration-300">
                                 <Github size={20} />
                               </a>
                             )}

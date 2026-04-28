@@ -465,7 +465,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
                       type="submit"
                       className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all text-sm shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] mt-2 active:shadow-inner"
                     >
-                      Enter Messenger
+                      Start messaging
                     </button>
                     
                     <p className="text-[10px] text-slate-400 text-center font-mono uppercase tracking-tight">🔒 AES-256 Encrypted Session</p>

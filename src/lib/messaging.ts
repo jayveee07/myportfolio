@@ -135,126 +135,59 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
 };
 
 export const startConversation = async (visitorInfo: { name: string, email: string, avatar?: string, ip?: string }) => {
-  // Ensure the visitor identity is synced in the 'users' collection first
+  // Sync the identity
   await syncVisitorIdentity(visitorInfo.email);
-
-  // Buffer for rules propagation of the new identity link
-  await new Promise(r => setTimeout(r, 800));
-
-  // Wait for auth to be fully established in the Firestore SDK
-  let attempts = 0;
-  while (!auth.currentUser && attempts < 10) {
-    await new Promise(r => setTimeout(r, 200));
-    attempts++;
-  }
 
   if (!auth.currentUser) {
     throw new Error("Authentication failed or timed out. Please try refreshing.");
   }
-
-  // Final small buffer for rules propagation
-  await new Promise(r => setTimeout(r, 500));
   
   const conversationId = getChatId(visitorInfo.email);
   console.log("StartConversation: resolved ID as", conversationId);
   const convoRef = doc(db, "conversations", conversationId);
+
+  const payload = {
+    participants: arrayUnion(auth.currentUser.uid, visitorInfo.email.toLowerCase(), ADMIN_EMAIL),
+    visitorUid: auth.currentUser.uid,
+    visitorId: visitorInfo.email.toLowerCase(),
+    visitorName: visitorInfo.name,
+    visitorEmail: visitorInfo.email.toLowerCase(),
+    updatedAt: serverTimestamp(),
+  } as any;
   
-  let convoSnap;
-  let retryCount = 0;
-  const maxRetries = 3;
-  
-  while (retryCount < maxRetries) {
-    try {
-      // Use standard getDoc for better compatibility in iframe environments
-      convoSnap = await getDoc(convoRef);
-      break; 
-    } catch (err: any) {
-      if ((err.code === 'permission-denied' || err.code === 'unauthenticated')) {
-        if (retryCount < maxRetries - 1) {
-          console.warn(`Retry ${retryCount + 1}/${maxRetries} on convo fetch [${convoRef.path}]: ${err.message}`);
-          await new Promise(r => setTimeout(r, 800)); 
-          retryCount++;
-        } else {
-          // If all retries fail, it might be an uninitialized convo for an anonymous user
-          // Try to proceed without the snap and let setDoc/updateDoc handle it
-          console.warn("Convo fetch failed on final retry. Proceeding to attempt creation.");
-          convoSnap = { exists: () => false } as any; 
-          break;
-        }
-      } else {
-        handleFirestoreError(err, 'get', convoRef.path);
-      }
-    }
+  if (visitorInfo.avatar && visitorInfo.avatar.length < 100000) {
+    payload.visitorAvatar = visitorInfo.avatar;
+  }
+  if (visitorInfo.ip) {
+    payload.visitorIp = visitorInfo.ip;
   }
 
-  if (!convoSnap) {
-    throw new Error("Unable to establish connection to chat server. Please try again in a moment.");
-  }
-
-  if (!convoSnap.exists()) {
-    const avatarToSave = visitorInfo.avatar && visitorInfo.avatar.length > 100000 ? null : visitorInfo.avatar;
-
-    let writeSuccess = false;
-    let writeRetry = 0;
-    while (!writeSuccess && writeRetry < 3) {
-      try {
-        const payload = {
-          participants: [visitorInfo.email.toLowerCase(), ADMIN_EMAIL, auth.currentUser.uid],
-          visitorUid: auth.currentUser.uid,
-          visitorId: visitorInfo.email.toLowerCase(),
-          visitorIp: visitorInfo.ip || 'unknown',
-          visitorName: visitorInfo.name,
-          visitorEmail: visitorInfo.email.toLowerCase(),
-          visitorAvatar: avatarToSave || null,
-          updatedAt: serverTimestamp(),
-          unreadCount: 0,
-          isAutoReplied: false,
-        };
-        console.log("startConversation: Attempting setDoc with payload", payload);
-        await setDoc(convoRef, payload);
-        writeSuccess = true;
-      } catch (err: any) {
-        if (err.code === 'permission-denied' && writeRetry < 2) {
-          console.warn(`Retry ${writeRetry + 1}/3 on convo creation: ${err.message}`);
-          await new Promise(r => setTimeout(r, 1000));
-          writeRetry++;
-        } else {
-          console.error("Critical setDoc failure in startConversation:", err.message);
-          handleFirestoreError(err, 'create', convoRef.path);
-        }
-      }
+  try {
+    const convoSnap = await getDoc(convoRef);
+    if (!convoSnap.exists()) {
+      await setDoc(convoRef, {
+        ...payload,
+        participants: [visitorInfo.email.toLowerCase(), ADMIN_EMAIL, auth.currentUser.uid],
+        unreadCount: 0,
+        isAutoReplied: false,
+      });
+      
+      // Initial AI message
+      const messagesRef = collection(db, `conversations/${conversationId}/messages`);
+      await addDoc(messagesRef, {
+        conversationId,
+        text: "Hi there! I'm John Vince's AI assistant. How can I help you today?",
+        senderId: ADMIN_EMAIL,
+        senderName: `${ADMIN_NAME} (AI)`,
+        senderAvatar: ADMIN_AVATAR,
+        createdAt: serverTimestamp(),
+      });
+    } else {
+      await updateDoc(convoRef, payload);
     }
-  } else {
-    const updatePayload: any = {};
-    if (visitorInfo.avatar) {
-      updatePayload.visitorAvatar = visitorInfo.avatar.length > 100000 ? null : visitorInfo.avatar;
-    }
-    if (visitorInfo.ip) updatePayload.visitorIp = visitorInfo.ip;
-    updatePayload.visitorUid = auth.currentUser.uid;
-    updatePayload.participants = arrayUnion(auth.currentUser.uid);
-    
-    // Identified by email
-    updatePayload.visitorId = visitorInfo.email.toLowerCase();
-    updatePayload.visitorEmail = visitorInfo.email.toLowerCase();
-    
-    if (Object.keys(updatePayload).length > 0) {
-      let updateSuccess = false;
-      let updateRetry = 0;
-      while (!updateSuccess && updateRetry < 3) {
-        try {
-          await updateDoc(convoRef, updatePayload);
-          updateSuccess = true;
-        } catch (err: any) {
-          if (err.code === 'permission-denied' && updateRetry < 2) {
-            console.warn(`Retry ${updateRetry + 1}/3 on convo update: ${err.message}`);
-            await new Promise(r => setTimeout(r, 1000));
-            updateRetry++;
-          } else {
-            handleFirestoreError(err, 'update', convoRef.path);
-          }
-        }
-      }
-    }
+  } catch (err: any) {
+    console.error("Error setting/updating conversation:", err);
+    handleFirestoreError(err, 'create', convoRef.path);
   }
   
   return conversationId;

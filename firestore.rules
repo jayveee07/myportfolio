@@ -86,41 +86,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Visits
     match /visits/{visitId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(visitId);
-      allow update: if isSignedIn() && isValidId(visitId);
+      allow read, write: if true;
     }
 
-    // Conversations
     match /conversations/{conversationId} {
-      allow read: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
-      allow create: if isSignedIn() && conversationId.startsWith('vst_');
-      allow update: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
-      allow delete: if isAdmin();
+      allow read, write: if isSignedIn();
 
-      // Messages Subcollection
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
-        allow create: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
-        allow update: if isSignedIn() && (isAdmin() || conversationId.startsWith('vst_'));
-        allow delete: if isAdmin();
+        allow read, write: if isSignedIn();
       }
     }
 
-    // Visitor Identity Records (Syncing Email to UID)
     match /users/{email} {
-      function isValidVisitorRecord(data) {
-        return (data.get('email', '') is string || !('email' in data)) && 
-               data.uid is string && 
-               data.uid == request.auth.uid;
-      }
-      
-      allow get: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(email) && isValidVisitorRecord(incoming()) && incoming().email == email;
-      allow update: if isSignedIn() && isValidId(email) && isValidVisitorRecord(incoming());
-      allow list: if isAdmin();
+      allow read, write: if isSignedIn();
     }
   }
 }

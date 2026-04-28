@@ -1,0 +1,72 @@
+query ListPublicProjects @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public as it only retrieves public projects.") {
+  projects(where: {isPublic: {eq: true}}) {
+    id
+    title
+    description
+    thumbnailUrl
+    liveUrl
+    repoUrl
+    projectType
+    createdAt
+    user {
+      displayName
+    }
+    projectImages_on_project {
+      imageUrl
+      caption
+      displayOrder
+    }
+    skills_via_ProjectSkill {
+      name
+    }
+  }
+}
+
+query GetMyProfile @auth(level: USER) {
+  user(key: {id_expr: "auth.uid"}) {
+    id
+    displayName
+    email
+    bio
+    photoUrl
+    resumeUrl
+    githubUrl
+    linkedinUrl
+    websiteUrl
+    createdAt
+    userSkills_on_user {
+      skill {
+        name
+      }
+    }
+    projects_on_user {
+      id
+      title
+      description
+      isPublic
+      thumbnailUrl
+    }
+  }
+}
+
+mutation CreateNewSkill($name: String!) @auth(level: USER, insecureReason: "This operation allows logged-in users to create new skills, which can then be associated with their projects or profile.") {
+  skill_insert(data: {
+    name: $name,
+    createdAt_expr: "request.time"
+  })
+}
+
+mutation UpdateMyProject($projectId: UUID!, $title: String, $description: String, $isPublic: Boolean, $liveUrl: String, $repoUrl: String, $thumbnailUrl: String, $projectType: String) @auth(expr: "auth.uid == request.auth.uid") {
+  project_update(
+    key: {id: $projectId},
+    data: {
+      title: $title,
+      description: $description,
+      isPublic: $isPublic,
+      liveUrl: $liveUrl,
+      repoUrl: $repoUrl,
+      thumbnailUrl: $thumbnailUrl,
+      projectType: $projectType
+    }
+  )
+}

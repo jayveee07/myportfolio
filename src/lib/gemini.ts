@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { getUserProfile, getExperience, getSkills, getProjects } from "./firebase";
 import { ADMIN_EMAIL } from "./messaging";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const ai = new GoogleGenAI({ apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "" });
 
 export async function generateChatResponse(userMessage: string, visitorName: string) {
   try {

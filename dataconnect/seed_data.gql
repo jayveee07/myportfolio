@@ -1,0 +1,113 @@
+mutation SeedData @transaction @auth(level: PUBLIC, insecureReason: "This is seed data and intended to be publicly available.") {
+  user_insertMany(data: [
+    {
+      id: "b2184a73-9a4c-4a3d-8e7c-2b5a1c3d9e8f",
+      displayName: "Alice Smith",
+      email: "alice.smith@example.com",
+      createdAt: "2023-01-15T10:00:00Z",
+      bio: "Full-stack developer with a passion for open-source.",
+      githubUrl: "https://github.com/alicesmith",
+      linkedinUrl: "https://www.linkedin.com/in/alicesmith",
+      websiteUrl: "https://alicesmith.dev"
+    },
+    {
+      id: "c4f0e1a2-8b6d-4e9f-7c0a-5d2b1e4f6a7b",
+      displayName: "Bob Johnson",
+      email: "bob.johnson@example.com",
+      createdAt: "2023-02-20T11:30:00Z",
+      bio: "UI/UX designer focusing on accessible and intuitive interfaces.",
+      photoUrl: "https://example.com/bob_photo.jpg"
+    }
+  ])
+  project_insertMany(data: [
+    {
+      id: "f8d7c6b5-a4e3-2d1c-0b9a-8e7d6c5b4a3f",
+      title: "My Portfolio Website",
+      description: "A personal website showcasing my projects and skills.",
+      createdAt: "2023-03-01T09:00:00Z",
+      isPublic: true,
+      projectType: "Web Development",
+      liveUrl: "https://my-portfolio.dev",
+      repoUrl: "https://github.com/alicesmith/my-portfolio",
+      userId: "b2184a73-9a4c-4a3d-8e7c-2b5a1c3d9e8f"
+    },
+    {
+      id: "e0a9b8c7-d6e5-f4a3-b2c1-d0e9f8a7b6c5",
+      title: "Mobile Game UI Kit",
+      description: "A set of customizable UI elements for mobile games.",
+      createdAt: "2023-04-10T14:00:00Z",
+      isPublic: true,
+      projectType: "UI/UX Design",
+      userId: "c4f0e1a2-8b6d-4e9f-7c0a-5d2b1e4f6a7b"
+    }
+  ])
+  projectImage_insertMany(data: [
+    {
+      id: "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      projectId: "f8d7c6b5-a4e3-2d1c-0b9a-8e7d6c5b4a3f",
+      imageUrl: "https://example.com/portfolio-screenshot1.png",
+      caption: "Homepage screenshot",
+      displayOrder: 1,
+      createdAt: "2023-03-01T09:05:00Z"
+    },
+    {
+      id: "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      projectId: "e0a9b8c7-d6e5-f4a3-b2c1-d0e9f8a7b6c5",
+      imageUrl: "https://example.com/game-ui-mockup1.png",
+      caption: "Main menu design",
+      displayOrder: 1,
+      createdAt: "2023-04-10T14:05:00Z"
+    }
+  ])
+  skill_insertMany(data: [
+    {
+      id: "d1e2f3a4-b5c6-d7e8-f9a0-b1c2d3e4f5a6",
+      name: "React",
+      createdAt: "2023-01-01T00:00:00Z"
+    },
+    {
+      id: "e3f4a5b6-c7d8-e9f0-a1b2-c3d4e5f6a7b8",
+      name: "Node.js",
+      createdAt: "2023-01-01T00:00:00Z"
+    },
+    {
+      id: "f5a6b7c8-d9e0-f1a2-b3c4-d5e6f7a8b9c0",
+      name: "Figma",
+      createdAt: "2023-01-01T00:00:00Z"
+    }
+  ])
+  userSkill_insertMany(data: [
+    {
+      userId: "b2184a73-9a4c-4a3d-8e7c-2b5a1c3d9e8f",
+      skillId: "d1e2f3a4-b5c6-d7e8-f9a0-b1c2d3e4f5a6",
+      createdAt: "2023-01-20T10:00:00Z"
+    },
+    {
+      userId: "b2184a73-9a4c-4a3d-8e7c-2b5a1c3d9e8f",
+      skillId: "e3f4a5b6-c7d8-e9f0-a1b2-c3d4e5f6a7b8",
+      createdAt: "2023-01-25T11:00:00Z"
+    },
+    {
+      userId: "c4f0e1a2-8b6d-4e9f-7c0a-5d2b1e4f6a7b",
+      skillId: "f5a6b7c8-d9e0-f1a2-b3c4-d5e6f7a8b9c0",
+      createdAt: "2023-02-25T12:00:00Z"
+    }
+  ])
+  projectSkill_insertMany(data: [
+    {
+      projectId: "f8d7c6b5-a4e3-2d1c-0b9a-8e7d6c5b4a3f",
+      skillId: "d1e2f3a4-b5c6-d7e8-f9a0-b1c2d3e4f5a6",
+      createdAt: "2023-03-05T10:00:00Z"
+    },
+    {
+      projectId: "f8d7c6b5-a4e3-2d1c-0b9a-8e7d6c5b4a3f",
+      skillId: "e3f4a5b6-c7d8-e9f0-a1b2-c3d4e5f6a7b8",
+      createdAt: "2023-03-07T10:00:00Z"
+    },
+    {
+      projectId: "e0a9b8c7-d6e5-f4a3-b2c1-d0e9f8a7b6c5",
+      skillId: "f5a6b7c8-d9e0-f1a2-b3c4-d5e6f7a8b9c0",
+      createdAt: "2023-04-12T15:00:00Z"
+    }
+  ])
+}

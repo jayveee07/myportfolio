@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Copy, Share2, Shield, ArrowUp } from 'lucide-react';
 
+// Importing the image allows Vite to process it, add a content hash for 
+// cache-busting, and provide the correct URL during deployment.
+import logoImg from '../assets/logoM.png';
+
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -10,6 +14,7 @@ interface LogoProps {
 export const Logo = ({ size = 'md', className = '' }: LogoProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const sizes = {
     sm: 'h-8 w-8',
@@ -63,22 +68,16 @@ export const Logo = ({ size = 'md', className = '' }: LogoProps) => {
         whileTap={{ scale: 0.95 }}
         className={`relative z-10 flex items-center justify-center rounded-xl overflow-hidden bg-primary shadow-lg shadow-primary/20 group ${sizes[size]}`}
       >
-        {/*
-          User: Please replace '/logo.png' with the actual path to your logo file in the public folder.
-        */}
         <img 
-          src="/logo.png" 
+          src={logoImg}
           alt="John Vince Paisan Logo" 
-          className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
-          onError={(e) => {
-            // Fallback to stylized text logo if image fails
-            e.currentTarget.style.display = 'none';
-            e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center', 'text-white', 'font-black');
-            if (e.currentTarget.parentElement) {
-              e.currentTarget.parentElement.innerHTML = 'VP';
-            }
-          }}
+          className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${hasError ? 'hidden' : 'block'}`}
+          onError={() => setHasError(true)}
         />
+        
+        {hasError && (
+          <span className="text-white font-black text-lg select-none animate-in fade-in zoom-in duration-300">VP</span>
+        )}
         
         {/* Glow effect */}
         <div className="absolute inset-0 bg-accent/20 opacity-0 group-hover:opacity-100 transition-opacity blur-md" />

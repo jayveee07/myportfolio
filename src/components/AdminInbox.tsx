@@ -1,3 +1,4 @@
+/** AdminInbox.tsx **/
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Inbox, Search, MessageSquare, Send, User, Clock, ArrowLeft, Settings, MoreVertical, LogOut, Eye, Mail, Sparkles, Sparkle, CheckCheck } from 'lucide-react';
@@ -21,10 +22,12 @@ import {
   ADMIN_EMAIL,
   ADMIN_NAME
 } from '../lib/messaging';
-import { auth, logOut, db, subscribeToActiveVisitors } from '../lib/firebase';
-import { Pencil, Save, X as CloseX, Trash2, Pin, Ban, Download, Volume2, VolumeX, Bot, ShieldAlert } from 'lucide-react';
+import { auth, logOut, db, subscribeToActiveVisitors, storage, handleStorageError } from '../lib/firebase';
+import { Pencil, Save, X as CloseX, Trash2, Pin, Ban, Download, Volume2, VolumeX, Bot, ShieldAlert, FileText, Loader2 } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, limit, where, getDocs } from 'firebase/firestore';
 import { suggestAdminResponse } from '../lib/gemini';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { SiteLogo } from './Logo';
 
 export interface Visit {
   id: string;
@@ -51,6 +54,7 @@ export const AdminInbox = ({ user }: { user: any }) => {
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState(0);
   const [inspectingVisitor, setInspectingVisitor] = useState<{email: string, history: Visit[]} | null>(null);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     autoReplyEnabled: true,
     notificationSounds: true,
@@ -91,25 +95,30 @@ export const AdminInbox = ({ user }: { user: any }) => {
   }, [input, selectedConvo?.id]);
 
   useEffect(() => {
-    if (auth.currentUser?.email === "jvpaisan@gmail.com") {
-      const unsub = subscribeToConversations(setConversations);
+    let unsubConvos: (() => void) | undefined;
+    let vUnsub: (() => void) | undefined;
+    let activeUnsub: (() => void) | undefined;
+    let settingsUnsub: (() => void) | undefined;
+
+    if (user?.email === "jvpaisan@gmail.com") {
+      unsubConvos = subscribeToConversations(setConversations);
       
       // Subscribe to visits
       const vQuery = query(collection(db, "visits"), orderBy("timestamp", "desc"), limit(100));
-      const vUnsub = onSnapshot(vQuery, (snap) => {
+      vUnsub = onSnapshot(vQuery, (snap) => {
         setVisits(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Visit[]);
       });
 
-      const activeUnsub = subscribeToActiveVisitors(setActiveCount);
-      const settingsUnsub = subscribeToAdminSettings(setAdminSettings);
-
-      return () => {
-        unsub();
-        vUnsub();
-        activeUnsub();
-        settingsUnsub();
-      };
+      activeUnsub = subscribeToActiveVisitors(setActiveCount);
+      settingsUnsub = subscribeToAdminSettings(setAdminSettings);
     }
+
+    return () => {
+      unsubConvos?.();
+      vUnsub?.();
+      activeUnsub?.();
+      settingsUnsub?.();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -210,6 +219,12 @@ export const AdminInbox = ({ user }: { user: any }) => {
 
   const handleGetAiSuggestion = async () => {
     if (!selectedConvo || messages.length === 0) return;
+    
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+      setError("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY is set in your .env file.");
+      return;
+    }
+
     setIsAiLoading(true);
     setAiSuggestion(null);
     try {
@@ -269,6 +284,42 @@ export const AdminInbox = ({ user }: { user: any }) => {
     setConversationMenuId(null);
   };
 
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || file.type !== 'application/pdf') {
+      alert("Please upload a valid PDF file.");
+      return;
+    }
+
+    setIsUploadingResume(true);
+    try {
+      const storageRef = ref(storage, `resumes/John_Vince_Paisan_Resume.pdf`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        null, 
+        (err) => { 
+          try {
+            handleStorageError(err);
+          } catch (e: any) {
+            setError(e.message);
+            setIsUploadingResume(false);
+          }
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          await updateAdminSettings({ resumeUrl: downloadURL });
+          setIsUploadingResume(false);
+          alert("Resume updated successfully!");
+        }
+      );
+    } catch (err: any) {
+      console.error("Upload failed:", err);
+      setError("Failed to upload resume. Check storage permissions.");
+      setIsUploadingResume(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Sidebar - Conversation List */}
@@ -276,9 +327,7 @@ export const AdminInbox = ({ user }: { user: any }) => {
         <div className="p-8 border-b border-slate-100 bg-white/50 backdrop-blur-md sticky top-0 z-20">
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-black text-primary flex items-center gap-3 tracking-tight">
-              <div className="w-10 h-10 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-                <Inbox size={20} />
-              </div> 
+              <SiteLogo size="sm" />
               Console
             </h1>
             <div className="flex items-center gap-3">
@@ -286,6 +335,13 @@ export const AdminInbox = ({ user }: { user: any }) => {
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">{activeCount} Active</span>
               </div>
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-95 border border-slate-100"
+                title="Global Settings"
+              >
+                <Settings size={18} />
+              </button>
               <button 
                 onClick={() => logOut()}
                 className="p-2.5 bg-slate-50 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition-all active:scale-95 border border-slate-100"
@@ -510,13 +566,6 @@ export const AdminInbox = ({ user }: { user: any }) => {
                   )}
                 </AnimatePresence>
                 <div className="flex gap-2 relative">
-                  <button 
-                    onClick={() => setShowSettingsModal(true)}
-                    className="p-3 hover:bg-slate-50 rounded-2xl text-slate-300 hover:text-slate-600 transition-all active:scale-95 border border-transparent hover:border-slate-100"
-                    title="Global Chat Settings"
-                  >
-                    <Settings size={20} />
-                  </button>
                   <div className="relative">
                     <button 
                       onClick={() => setConversationMenuId(conversationMenuId === selectedConvo.id ? null : selectedConvo.id)}
@@ -925,6 +974,32 @@ export const AdminInbox = ({ user }: { user: any }) => {
                         className="w-6 h-6 bg-white rounded-full absolute top-1 shadow-md"
                       />
                     </button>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-3xl p-6 flex items-center justify-between group transition-all hover:bg-slate-100/50">
+                    <div className="flex items-center gap-5">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${adminSettings.resumeUrl ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-200' : 'bg-white text-slate-300'}`}>
+                        {isUploadingResume ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-primary">Resume Management</p>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          {adminSettings.resumeUrl ? 'Active Resume: Live on Site' : 'No custom resume uploaded yet.'}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer">
+                      <div className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all">
+                        {isUploadingResume ? 'Uploading...' : 'Upload PDF'}
+                      </div>
+                      <input 
+                        type="file" 
+                        accept=".pdf" 
+                        className="hidden" 
+                        onChange={handleResumeUpload} 
+                        disabled={isUploadingResume}
+                      />
+                    </label>
                   </div>
                 </section>
               </div>

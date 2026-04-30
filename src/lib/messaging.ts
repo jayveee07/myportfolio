@@ -384,6 +384,7 @@ export interface AdminSettings {
   autoReplyEnabled: boolean;
   notificationSounds: boolean;
   onlineStatus: 'online' | 'busy' | 'offline';
+  resumeUrl?: string;
   onlineHours?: string;
 }
 

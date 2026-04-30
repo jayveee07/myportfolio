@@ -2,9 +2,16 @@ import { GoogleGenAI } from "@google/genai";
 import { getUserProfile, getExperience, getSkills, getProjects } from "./firebase";
 import { ADMIN_EMAIL } from "./messaging";
 
-const ai = new GoogleGenAI({ apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "" });
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!API_KEY) {
+  console.warn("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY is set in your .env file.");
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY || "dummy_key" });
 
 export async function generateChatResponse(userMessage: string, visitorName: string) {
+  if (!API_KEY) return "The AI assistant is currently offline. Please contact John Vince directly.";
   try {
     const [profile, experience, skills, projects] = await Promise.all([
       getUserProfile(),
@@ -38,10 +45,11 @@ export async function generateChatResponse(userMessage: string, visitorName: str
       - If you don't know the answer, politely suggest that they wait for John Vince to reply or contact him at ${profile?.email}.
       - Reference his specific experience and projects when relevant.
       - Keep the response under 100 words.
+      - Format: Use simple text, no markdown.
     `;
 
     const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [
         { role: "user", parts: [{ text: `Context: ${context}\n\nVisitor Message: ${userMessage}` }] }
       ]
@@ -55,6 +63,7 @@ export async function generateChatResponse(userMessage: string, visitorName: str
 }
 
 export async function suggestAdminResponse(messages: any[], visitorName: string) {
+  if (!API_KEY) return null;
   try {
     const [profile, experience, skills, projects] = await Promise.all([
       getUserProfile(),

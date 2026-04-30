@@ -6,8 +6,10 @@ import {
   signOut, 
   signInWithEmailAndPassword,
   signInAnonymously,
-  deleteUser
+  deleteUser,
+  connectAuthEmulator
 } from "firebase/auth";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { 
   getFirestore,
   doc, 
@@ -24,8 +26,11 @@ import {
   onSnapshot,
   where,
   Timestamp,
-  initializeFirestore
+  initializeFirestore,
+  connectFirestoreEmulator
 } from "firebase/firestore";
+import { getDataConnect, connectDataConnectEmulator } from "firebase/data-connect";
+import { connectorConfig } from "../dataconnect-generated";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 import { getVisitorIp } from "./ipService";
@@ -38,6 +43,20 @@ export const db = initializeFirestore(app, {
 }, (firebaseConfig as any).firestoreDatabaseId || "(default)");
 
 export const auth = getAuth(app);
+
+export const storage = getStorage(app);
+
+export const dataConnect = getDataConnect(app, connectorConfig);
+
+// Connect to emulators in Dev OR if testing a production build locally
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+if (import.meta.env.DEV || isLocalhost) {
+  connectAuthEmulator(auth, 'http://localhost:9099');
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectStorageEmulator(storage, 'localhost', 9199);
+  connectDataConnectEmulator(dataConnect, 'localhost', 9399);
+  console.info("⚡ Developing locally: Connected to Firebase Emulators");
+}
 
 export const googleProvider = new GoogleAuthProvider();
 
@@ -100,6 +119,19 @@ export const handleFirestoreError = (err: any, operationType: FirestoreErrorInfo
       }
     };
     throw new Error(JSON.stringify(errorInfo));
+  }
+  throw err;
+};
+
+export const handleStorageError = (err: any) => {
+  if (err.code === 'storage/unauthorized' || err.status === 403 || err.message?.toLowerCase().includes('permission denied')) {
+    throw new Error("You don't have permission to upload files. Please sign in as admin.");
+  }
+  if (err.code === 'storage/canceled') {
+    throw new Error("Upload canceled.");
+  }
+  if (err.message?.includes('ERR_FAILED') || err.message?.toLowerCase().includes('network error') || !err.code) {
+    throw new Error("Network error: This is likely a CORS issue. Ensure the Storage bucket allows your domain (e.g., http://127.0.0.1:5000) via gsutil configuration.");
   }
   throw err;
 };
@@ -340,4 +372,74 @@ export const getSkills = async () => {
 export const getProjects = async () => {
   const querySnapshot = await getDocs(collection(db, "projects"));
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+export const DEFAULT_EXPERIENCE = [
+  {
+    company: "Guild Securities, Inc.",
+    role: "Settlement Associate",
+    period: "08/2025 – 01/2026",
+    description: [
+      "Processed and reconciled high-volume financial transactions with 99%+ accuracy",
+      "Investigated discrepancies and coordinated with banks/counterparties for resolution",
+      "Ensured compliance with financial regulations and internal audit standards"
+    ],
+    order: 1
+  },
+  {
+    company: "IQVIA",
+    role: "Senior Data Input Associate",
+    period: "05/2023 – 05/2025",
+    description: [
+      "Processed large-scale datasets while maintaining strict quality standards",
+      "Consistently achieved high productivity and quality KPIs in a fast-paced environment",
+      "Identified data inconsistencies and improved data integrity processes"
+    ],
+    order: 2
+  },
+  {
+    company: "Acaciasoft Corporation",
+    role: "Junior Software Engineer",
+    period: "04/2022 – 04/2023",
+    description: [
+      "Developed and maintained web applications using Laravel, PHP, and MySQL",
+      "Debugged and resolved system issues, improving stability and performance",
+      "Collaborated with cross-functional teams to deliver system enhancements"
+    ],
+    order: 3
+  },
+  {
+    company: "Virtual Experts PH",
+    role: "Virtual Assistant / Data Support",
+    period: "04/2021 – 04/2022",
+    description: [
+      "Automated repetitive workflows using Python scripts, reducing manual workload",
+      "Managed and organized client data systems for accuracy and accessibility",
+      "Provided technical and operational support to diverse client accounts"
+    ],
+    order: 4
+  }
+];
+
+export const DEFAULT_SKILLS = [
+  { category: "Web Development", items: ["Node.js", "React", "Laravel", "PHP", "JavaScript", "HTML", "CSS", "jQuery"], order: 1 },
+  { category: "Data & Systems", items: ["Python Automation", "Data Analysis", "MySQL", "System Monitoring", "Excel Macros", "Financial Systems"], order: 2 },
+  { category: "Tools & Cloud", items: ["Google Cloud", "Firebase", "Git", "VS Code", "Google Sheets", "Financial Reconciliation"], order: 3 }
+];
+
+export const seedPortfolioData = async () => {
+  try {
+    const expSnap = await getDocs(query(collection(db, 'experience'), limit(1)));
+    if (!expSnap.empty) {
+      alert("Database already contains experience data. Skipping seed.");
+      return;
+    }
+    console.log("Starting seed...");
+    for (const exp of DEFAULT_EXPERIENCE) { await addDoc(collection(db, 'experience'), exp); }
+    for (const skill of DEFAULT_SKILLS) { await addDoc(collection(db, 'skills'), skill); }
+    alert("Database seeded successfully! Refresh the page.");
+  } catch (error) {
+    console.error("Error seeding database:", error);
+    alert("Failed to seed database. Check console.");
+  }
 };

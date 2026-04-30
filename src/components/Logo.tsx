@@ -11,7 +11,7 @@ interface LogoProps {
   className?: string;
 }
 
-export const Logo = ({ size = 'md', className = '' }: LogoProps) => {
+export const SiteLogo = ({ size = 'md', className = '' }: LogoProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -76,7 +76,7 @@ export const Logo = ({ size = 'md', className = '' }: LogoProps) => {
         />
         
         {hasError && (
-          <span className="text-white font-black text-lg select-none animate-in fade-in zoom-in duration-300">VP</span>
+          <span className="text-white font-black text-lg select-none animate-in fade-in zoom-in duration-300">JP</span> // Change initials here
         )}
         
         {/* Glow effect */}

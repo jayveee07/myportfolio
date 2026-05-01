@@ -22,12 +22,13 @@ interface ChatWidgetProps {
   onOpen: () => void;
   onClose: () => void;
   adminName: string;
+  isShifted?: boolean;
 }
 
 // Variable to track if the login happened in the current page session (doesn't survive refresh)
 let isFreshLogin = false;
 
-export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetProps) => {
+export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: ChatWidgetProps) => {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
   const [user, setUser] = useState(auth.currentUser);
@@ -338,7 +339,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
             whileTap={{ scale: 0.95 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={onOpen}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-[300] flex items-center justify-center hover:bg-slate-800 transition-all group"
+            className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-14 h-14 bg-primary text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-[300] flex items-center justify-center hover:bg-slate-800 transition-all duration-300 group`}
           >
             <MessageSquare size={24} className="group-hover:rotate-6 transition-transform" />
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full border-2 border-white flex items-center justify-center">
@@ -354,7 +355,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName }: ChatWidgetPro
             initial={{ opacity: 0, y: 20, scale: 0.95, transformOrigin: 'bottom right' }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[620px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] z-[300] border border-slate-200/50 flex flex-col overflow-hidden"
+            className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[620px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] z-[300] border border-slate-200/50 flex flex-col overflow-hidden transition-all duration-300`}
           >
           {/* Header */}
           <div className="bg-primary px-6 py-8 text-white flex items-center justify-between relative overflow-hidden shrink-0">

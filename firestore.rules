@@ -2,13 +2,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- Global Safety Net ---
-    // match /{document=**} {
-    //   allow read, write: if false;
-    // }
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: education
+    // Fields:
+    //   - school: string (required)
+    //   - degree: string (required)
+    //   - period: string (required)
+    //   - description: list of strings (required)
+    //   - order: number (required)
+    //
+    // Collection: experience
+    // Fields:
+    //   - company: string (required)
+    //   - role: string (required)
+    //   - period: string (required)
+    //   - description: list of strings (required)
+    //   - order: number (required)
+    //
+    // Collection: visits
+    // Fields:
+    //   - visitorId: string (required)
+    //   - path: string (required)
+    //   - lastActive: timestamp (required)
+    //   - ip: string (optional)
+    //   - userAgent: string (optional)
+    //
+    // ===============================================================
 
+    // ===============================================================
     // --- Helpers ---
+    // ===============================================================
     function isSignedIn() {
       return request.auth != null && request.auth.uid != null;
     }
@@ -20,81 +46,108 @@ service cloud.firestore {
       );
     }
     
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
     }
 
-    function incoming() {
-      return request.resource.data;
+    function validString(field, max) {
+      return request.resource.data[field] is string && request.resource.data[field].size() <= max;
     }
 
-    function existing() {
-      return resource.data;
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 256 && id.matches('^[a-zA-Z0-9_.@\\s\\-:_]+$');
+    function isValidEmail(email) {
+      return email is string &&
+             email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
-    // --- Entity Validations ---
+    function isValidList(field, maxCount) {
+      return request.resource.data[field] is list && request.resource.data[field].size() <= maxCount;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidEducation(data) {
+      return hasRequiredFields(['school', 'degree', 'period', 'order']) &&
+             validString('school', 200) &&
+             validString('degree', 200) &&
+             (!('description' in request.resource.data) || isValidList('description', 20)) &&
+             data.order is number;
+    }
 
     function isValidVisit(data) {
-      return data.get('visitorId', '') is string &&
-             data.get('visitorId', '').size() <= 500;
+      return hasRequiredFields(['visitorId', 'path', 'lastActive']) &&
+             validString('visitorId', 500) &&
+             validString('path', 1000);
     }
 
     function isValidConversation(data) {
-      return (data.get('visitorEmail', '') is string || !('visitorEmail' in data));
+      return hasRequiredFields(['name', 'email', 'message', 'source', 'status', 'timestamp', 'visitorUid']) &&
+             validStringLength('name', 1, 100) &&
+             isValidEmail(data.email) &&
+             validStringLength('message', 1, 2000) &&
+             validStringLength('source', 1, 100) &&
+             validStringLength('status', 1, 50);
     }
-
-    function isValidMessage(data) {
-      return data.get('text', '') is string &&
-             data.get('text', '').size() > 0 &&
-             data.get('senderId', '') is string;
-    }
-
+    // ===============================================================
+    // Routes
+    // ===============================================================
+    
     // Health Check / Test Connection
     match /test/connection {
       allow get: if true;
     }
 
-    // --- Collections ---
-
     // Public Collections
     match /userProfile/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
     }
     
     match /experience/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
     }
     
     match /skills/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
     }
     
     match /projects/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
+    }
+
+    match /education/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidEducation(request.resource.data);
     }
 
     match /settings/chat {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
     }
 
     match /visits/{visitId} {
-      allow read, write: if true;
+      // Allow visitors to record their own presence
+      allow read: if isAdmin();
+      allow create, update: if isValidVisit(request.resource.data);
     }
 
     match /conversations/{conversationId} {
-      allow read, write: if isSignedIn();
+      // Basic access for authenticated visitors/admin
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
 
       match /messages/{messageId} {
-        allow read, write: if isSignedIn();
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
       }
     }
 

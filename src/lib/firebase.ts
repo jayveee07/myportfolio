@@ -25,6 +25,7 @@ import {
   serverTimestamp,
   onSnapshot,
   where,
+  limit,
   Timestamp,
   initializeFirestore,
   connectFirestoreEmulator
@@ -224,46 +225,45 @@ export const recordVisit = async (path: string) => {
       localStorage.setItem('visitor_id', visitorId);
     }
     
-    const visitId = visitorId.toLowerCase().trim().replace(/[^a-zA-Z0-9.@]/g, '_');
+const visitId = visitorId.toLowerCase().trim().replace(/[^a-zA-Z0-9.@]/g, '_');
     const visitRef = doc(db, "visits", visitId);
-  
-  try {
-    // Attempt to update first (most common for active sessions)
-    await updateDoc(visitRef, {
-      lastActive: serverTimestamp(),
-      path,
-      visitorId, // keep synced
-      ip: ip || 'unknown',
-      userAgent: navigator.userAgent
-    });
-  } catch (err: any) {
-    const isPermissionDenied = err.code === 'permission-denied' || 
-                              err.message?.toLowerCase().includes('permission') || 
-                              err.message?.toLowerCase().includes('insufficient');
     
-    if (err.code === 'not-found' || isPermissionDenied) {
-      // Actually permission-denied might happen if doc doesn't exist AND we don't have update rights but DO have set rights
-      // Create if doesn't exist
-      try {
-        await setDoc(visitRef, {
-          visitorId,
-          email: email || null,
-          ip: ip || 'unknown',
-          path,
-          userAgent: navigator.userAgent,
-          timestamp: serverTimestamp(),
-          lastActive: serverTimestamp(),
-        });
-      } catch (innerErr: any) {
-        console.error("Failed to create visit record:", innerErr.message);
+    try {
+      // Attempt to update first (most common for active sessions)
+      await updateDoc(visitRef, {
+        lastActive: serverTimestamp(),
+        path,
+        visitorId, // keep synced
+        ip: ip || 'unknown',
+        userAgent: navigator.userAgent
+      });
+    } catch (err: any) {
+      const isPermissionDenied = err.code === 'permission-denied' || 
+                                err.message?.toLowerCase().includes('permission') || 
+                                err.message?.toLowerCase().includes('insufficient');
+      
+      if (err.code === 'not-found' || isPermissionDenied) {
+        // Create if doesn't exist
+        try {
+          await setDoc(visitRef, {
+            visitorId,
+            email: email || null,
+            ip: ip || 'unknown',
+            path,
+            userAgent: navigator.userAgent,
+            timestamp: serverTimestamp(),
+            lastActive: serverTimestamp(),
+          });
+        } catch (innerErr: any) {
+          console.error("Failed to create visit record:", innerErr.message);
+        }
+      } else {
+        console.error("Failed to record visit update:", err.message);
       }
-    } else {
-      console.error("Failed to record visit update:", err.message);
     }
+  } catch (err: any) {
+    console.error("recordVisit completion failure:", err.message);
   }
-} catch (err: any) {
-  console.error("recordVisit completion failure:", err.message);
-}
 };
 
 export const updateHeartbeat = async () => {
@@ -349,29 +349,78 @@ export async function testConnection() {
 
 // Helper for fetching user profile
 export const getUserProfile = async () => {
-  const docRef = doc(db, "userProfile", "main");
-  const docSnap = await getDoc(docRef);
-  return docSnap.exists() ? docSnap.data() : null;
+  try {
+    const docRef = doc(db, "userProfile", "main");
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? docSnap.data() : null;
+  } catch (err) {
+    return handleFirestoreError(err, 'get', 'userProfile/main');
+  }
 };
 
 // Helper for fetching experience
 export const getExperience = async () => {
-  const q = query(collection(db, "experience"), orderBy("order", "asc"));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  try {
+    const q = query(collection(db, "experience"), orderBy("order", "asc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    return handleFirestoreError(err, 'list', 'experience');
+  }
 };
 
 // Helper for fetching skills
 export const getSkills = async () => {
-  const q = query(collection(db, "skills"), orderBy("order", "asc"));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  try {
+    const q = query(collection(db, "skills"), orderBy("order", "asc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    return handleFirestoreError(err, 'list', 'skills');
+  }
+};
+
+// Helper for fetching education
+export const getEducation = async () => {
+  try {
+    const q = query(collection(db, "education"), orderBy("order", "asc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    return handleFirestoreError(err, 'list', 'education');
+  }
 };
 
 // Helper for fetching projects
 export const getProjects = async () => {
-  const querySnapshot = await getDocs(collection(db, "projects"));
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  try {
+    const querySnapshot = await getDocs(collection(db, "projects"));
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    return handleFirestoreError(err, 'list', 'projects');
+  }
+};
+
+/**
+ * Saves a contact form submission to Firestore.
+ * This acts as a reliable backup to the email dispatch.
+ */
+export const submitInquiry = async (data: { name: string; email: string; message: string }) => {
+  try {
+    // Ensure user is authenticated (anonymously or otherwise)
+    await ensureAuthInited();
+    
+    const inquiriesRef = collection(db, "conversations");
+    return await addDoc(inquiriesRef, {
+      ...data,
+      source: 'portfolio_contact_form',
+      status: 'new',
+      timestamp: serverTimestamp(),
+      visitorUid: auth.currentUser?.uid || 'unknown'
+    });
+  } catch (err) {
+    return handleFirestoreError(err, 'create', 'conversations');
+  }
 };
 
 export const DEFAULT_EXPERIENCE = [
@@ -427,6 +476,36 @@ export const DEFAULT_SKILLS = [
   { category: "Tools & Cloud", items: ["Google Cloud", "Firebase", "Git", "VS Code", "Google Sheets", "Financial Reconciliation"], order: 3 }
 ];
 
+export const DEFAULT_EDUCATION = [
+  {
+    school: "Advance Central College",
+    degree: "Bachelor of Science: Information Systems",
+    period: "2018 – 2022",
+    description: [ // Achievements and details
+      "Graduated with honors",
+      "Programmer of the Year: Recognized for top-tier coding proficiency and technical performance",
+      "Best Capstone Project: Led development of a system solution recognized for innovation and applicability",
+      "Core IT courses including systems analysis, database management, and web development",
+      "Active member of the college tech club"
+    ],
+    order: 1
+  },
+  {
+    school: "TESDA",
+    degree: "Java Programming NCIII",
+    period: "Certified",
+    description: ["Finisher of TESDA Java Programming NCIII - Technical Education and Skills Development Authority"],
+    order: 2
+  },
+  {
+    school: "TESDA",
+    degree: "Visual Graphic Design NCIII",
+    period: "Certified",
+    description: ["National Certificate in Visual Graphic Design (NCIII)"],
+    order: 3
+  }
+];
+
 export const seedPortfolioData = async () => {
   try {
     const expSnap = await getDocs(query(collection(db, 'experience'), limit(1)));
@@ -437,6 +516,7 @@ export const seedPortfolioData = async () => {
     console.log("Starting seed...");
     for (const exp of DEFAULT_EXPERIENCE) { await addDoc(collection(db, 'experience'), exp); }
     for (const skill of DEFAULT_SKILLS) { await addDoc(collection(db, 'skills'), skill); }
+    for (const edu of DEFAULT_EDUCATION) { await addDoc(collection(db, 'education'), edu); }
     alert("Database seeded successfully! Refresh the page.");
   } catch (error) {
     console.error("Error seeding database:", error);

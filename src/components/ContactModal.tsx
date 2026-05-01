@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Mail, MapPin, CheckCircle, Shield } from 'lucide-react';
+import { X, Send, Mail, MapPin, CheckCircle, Shield, Loader2, Copy, ExternalLink } from 'lucide-react';
+import { submitInquiry } from '../lib/firebase';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -8,40 +9,94 @@ interface ContactModalProps {
   profile: any;
 }
 
+const LESS_THAN_24 = "< 24 Hours";
+
+const isValidEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) => {
-  if (isOpen) console.log('ContactModal: System Render Active');
-  
+  const formRef = useRef<HTMLFormElement>(null);
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [emailError, setEmailError] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+
+  const WEB3FORMS_ACCESS_KEY = 'f1122fde-ca48-4c2a-8652-c162845b2a33';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErrorMessage('');
+    setEmailError('');
+    
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const email = formData.get('email') as string;
+    const name = formData.get('name') as string;
+    const message = formData.get('message') as string;
+    
+    // Validate email
+    if (!email || !isValidEmail(email)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+    
     setFormStatus('sending');
     
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-
     try {
-      // Replace 'your-form-id' with your actual Formspree ID
-      const response = await fetch('https://formspree.io/f/your-form-id', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(data),
+      // Step 1: Backup to Firestore so you never lose a message
+      await submitInquiry({ name, email, message });
+      
+      // Step 2: Send email using Web3Forms
+      if (!WEB3FORMS_ACCESS_KEY) {
+        throw new Error("Web3Forms access key is not configured. Please check ContactModal.tsx.");
+      }
+
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          name: name,
+          email: email,
+          message: message,
+          from_name: "Portfolio Inquiry",
+          subject: `New Inquiry from ${name}`,
+        }),
       });
 
-      if (response.ok) {
+      const result = await response.json();
+
+      if (result.success) {
         setFormStatus('success');
-        (e.target as HTMLFormElement).reset();
+        form.reset();
         setTimeout(() => {
           setFormStatus('idle');
           onClose();
         }, 3000);
       } else {
-        setFormStatus('error');
+        throw new Error(result.message || "Failed to submit form to Web3Forms.");
       }
     } catch (err) {
       setFormStatus('error');
+      setErrorMessage(`Failed to send message: ${err instanceof Error ? err.message : 'Please check Web3Forms configuration or your network connection.'}`);
     }
   };
+
+  const copyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(profile?.email || 'jvpaisan@gmail.com');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for browsers that don't support clipboard API
+      window.location.href = `mailto:${profile?.email || 'jvpaisan@gmail.com'}`;
+    }
+  };
+
 
   return (
     <AnimatePresence>
@@ -76,7 +131,7 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                   <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">System Online</span>
                 </div>
                 <p className="text-[10px] font-mono font-bold text-slate-300 leading-tight uppercase tracking-widest">
-                  Response Latency:<br /><span className="text-primary">&lt; 24 Hours</span>
+                  Response Latency:<br /><span className="text-primary">{LESS_THAN_24}</span>
                 </p>
               </div>
             </div>
@@ -87,22 +142,95 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                 <X size={24} />
               </button>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">Identity</label>
                   <input type="text" name="name" required placeholder="Your Full Name" className="w-full px-5 py-4 rounded-xl border border-line bg-white focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">Return Path</label>
-                  <input type="email" name="email" required placeholder="email@domain.com" className="w-full px-5 py-4 rounded-xl border border-line bg-white focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold" />
+                  <input 
+                    type="email" 
+                    name="email" 
+                    required 
+                    placeholder="email@domain.com" 
+                    className={`w-full px-5 py-4 rounded-xl border bg-white focus:outline-none focus:ring-1 transition-all text-sm font-bold ${emailError ? 'border-red-300 focus:ring-red-200' : 'border-line focus:ring-accent'}`}
+                    onChange={() => setEmailError('')}
+                  />
+                  {emailError && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-red-500 text-xs mt-1"
+                    >
+                      {emailError}
+                    </motion.p>
+                  )}
                 </div>
+
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">Message Payload</label>
                   <textarea name="message" required rows={4} placeholder="Describe your inquiry..." className="w-full px-5 py-4 rounded-xl border border-line bg-white focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold resize-none" />
                 </div>
 
-                <button type="submit" disabled={formStatus === 'sending'} className="ink-button !w-full h-14 mt-4">
-                  {formStatus === 'sending' ? 'TRANSMITTING...' : formStatus === 'success' ? 'DISPATCHED' : 'EXECUTE DISPATCH'}
+                {/* Error Message */}
+                {errorMessage && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-red-50 text-red-600 text-sm p-4 rounded-xl border border-red-100"
+                  >
+                    {errorMessage}
+                  </motion.div>
+                )}
+
+                {/* Fallback Options */}
+                {formStatus === 'error' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col gap-3"
+                  >
+                    <p className="text-xs text-slate-500 text-center">Or contact directly:</p>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={copyEmail}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        <Copy size={16} />
+                        {copied ? 'Copied!' : 'Copy Email'}
+                      </button>
+                      <a
+                        href={`mailto:${profile?.email || 'jvpaisan@gmail.com'}?subject=Portfolio Contact`}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold transition-all"
+                      >
+                        <ExternalLink size={16} />
+                        Open Email App
+                      </a>
+                    </div>
+                  </motion.div>
+                )}
+
+                <button 
+
+                  type="submit" 
+                  disabled={formStatus === 'sending'} 
+                  className="ink-button !w-full h-14 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {formStatus === 'sending' ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={18} className="animate-spin" />
+                      TRANSMITTING...
+                    </span>
+                  ) : formStatus === 'success' ? (
+                    <span className="flex items-center gap-2">
+                      <CheckCircle size={18} />
+                      DISPATCHED
+                    </span>
+                  ) : (
+                    'EXECUTE DISPATCH'
+                  )}
                 </button>
                 
                 <p className="text-center text-[9px] font-mono font-bold text-slate-300 uppercase tracking-widest mt-4">

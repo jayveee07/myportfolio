@@ -29,6 +29,7 @@ export interface Message {
   isEdited?: boolean;
   isDeleted?: boolean;
   deletedBy?: string[];
+  isRead?: boolean;
 }
 
 export interface Conversation {
@@ -50,7 +51,7 @@ export interface Conversation {
 }
 
 export const ADMIN_EMAIL = "jvpaisan@gmail.com";
-const ADMIN_UID = "admin_placeholder"; // ideally we should get the real admin UID if possible
+const ADMIN_UID = "admin_placeholder";
 
 export const ADMIN_NAME = "John Vince Paisan";
 const ADMIN_AVATAR = "https://ui-avatars.com/api/?name=JV&background=0f172a&color=fff";
@@ -84,44 +85,38 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
     updatedAt: serverTimestamp(),
   };
 
-  // Handle Auto-reply logic for visitors
   if (!isAdminReply) {
-  try {
-    const convoSnap = await getDoc(convoRef);
-    const convoData = convoSnap.data() as Conversation;
+    try {
+      const convoSnap = await getDoc(convoRef);
+      const convoData = convoSnap.data() as Conversation;
 
-    // Increment unread count for admin
-    updateData.unreadCount = (convoData?.unreadCount || 0) + 1;
+      updateData.unreadCount = (convoData?.unreadCount || 0) + 1;
 
-    // Only auto-reply if not already replied AND if admin hasn't sent any messages yet
-    if (!convoData?.isAutoReplied) {
-      const adminMsgQuery = query(messagesRef, where("senderId", "==", ADMIN_EMAIL));
-      const adminMsgSnap = await getDocs(adminMsgQuery);
+      if (!convoData?.isAutoReplied) {
+        const adminMsgQuery = query(messagesRef, where("senderId", "==", ADMIN_EMAIL));
+        const adminMsgSnap = await getDocs(adminMsgQuery);
 
-      if (adminMsgSnap.empty) {
-        // Get AI generated response
-        const aiResponse = await generateChatResponse(text, visitorInfo.name);
-        
-        // Create auto-reply message
-        const autoReplyData = {
-          conversationId,
-          text: aiResponse || "Thanks for reaching out! I've received your message and will get back to you shortly.",
-          senderId: ADMIN_EMAIL,
-          senderName: `${ADMIN_NAME} (AI)`,
-          senderAvatar: ADMIN_AVATAR,
-          createdAt: serverTimestamp(),
-        };
-        await addDoc(messagesRef, autoReplyData);
-        updateData.isAutoReplied = true;
-        updateData.lastMessage = autoReplyData.text;
-      } else {
-        updateData.isAutoReplied = true;
+        if (adminMsgSnap.empty) {
+          const aiResponse = await generateChatResponse(text, visitorInfo.name);
+          
+          const autoReplyData = {
+            conversationId,
+            text: aiResponse || "Thanks for reaching out! I've received your message and will get back to you shortly.",
+            senderId: ADMIN_EMAIL,
+            senderName: `${ADMIN_NAME} (AI)`,
+            senderAvatar: ADMIN_AVATAR,
+            createdAt: serverTimestamp(),
+          };
+          await addDoc(messagesRef, autoReplyData);
+          updateData.isAutoReplied = true;
+          updateData.lastMessage = autoReplyData.text;
+        } else {
+          updateData.isAutoReplied = true;
+        }
       }
+    } catch (err: any) {
+      console.warn("Auto-reply logic failed (likely permission):", err.message);
     }
-  } catch (err: any) {
-    console.warn("Auto-reply logic failed (likely permission):", err.message);
-    // Silent fail for auto-reply logic, it's non-critical
-  }
   } else {
     updateData.unreadCount = 0;
     updateData.isAutoReplied = true;
@@ -135,7 +130,6 @@ export const sendMessage = async (conversationId: string, text: string, visitorI
 };
 
 export const startConversation = async (visitorInfo: { name: string, email: string, avatar?: string, ip?: string }) => {
-  // Sync the identity
   await syncVisitorIdentity(visitorInfo.email);
 
   if (!auth.currentUser) {
@@ -172,7 +166,6 @@ export const startConversation = async (visitorInfo: { name: string, email: stri
         isAutoReplied: false,
       });
       
-      // Initial AI message
       const messagesRef = collection(db, `conversations/${conversationId}/messages`);
       await addDoc(messagesRef, {
         conversationId,
@@ -217,7 +210,6 @@ export const editMessage = async (conversationId: string, messageId: string, new
   const now = Timestamp.now().toMillis();
   const created = msgData.createdAt?.toMillis() || now;
   
-  // 10 minute window
   if (now - created > 10 * 60 * 1000) {
     throw new Error("Editing window expired (10 minutes).");
   }
@@ -227,7 +219,6 @@ export const editMessage = async (conversationId: string, messageId: string, new
     isEdited: true
   });
   
-  // Also update last message in conversation if this was the latest message
   const convoRef = doc(db, "conversations", conversationId);
   const convoSnap = await getDoc(convoRef);
   if (convoSnap.exists()) {
@@ -250,7 +241,6 @@ export const deleteMessage = async (conversationId: string, messageId: string, m
   if (!currentEmail) return;
 
   if (mode === 'everyone') {
-    // Only sender or admin can delete for everyone
     if (msgData.senderId !== currentEmail && auth.currentUser?.email !== ADMIN_EMAIL) {
       throw new Error("You don't have permission to delete this message for everyone.");
     }
@@ -260,7 +250,6 @@ export const deleteMessage = async (conversationId: string, messageId: string, m
       isDeleted: true
     });
 
-    // Also update last message in conversation if this was the latest message
     const convoRef = doc(db, "conversations", conversationId);
     const convoSnap = await getDoc(convoRef);
     if (convoSnap.exists()) {
@@ -272,7 +261,6 @@ export const deleteMessage = async (conversationId: string, messageId: string, m
       }
     }
   } else {
-    // Delete for myself
     const deletedBy = msgData.deletedBy || [];
     if (!deletedBy.includes(currentEmail)) {
       await updateDoc(msgRef, {
@@ -338,7 +326,6 @@ export const subscribeToMessages = (conversationId: string, callback: (messages:
 };
 
 export const subscribeToConversations = (callback: (conversations: Conversation[]) => void) => {
-  // Guard: Only Admin can subscribe to all conversations
   const isAdmin = () => {
     const u = auth.currentUser;
     return u && (u.email === "jvpaisan@gmail.com" || u.uid === "IrWAuYlvLkOSBOIljYrxXP7dVye2");
@@ -393,7 +380,6 @@ export const subscribeToAdminSettings = (callback: (settings: AdminSettings) => 
     if (snap.exists()) {
       callback(snap.data() as AdminSettings);
     } else {
-      // Default settings
       callback({
         autoReplyEnabled: true,
         notificationSounds: true,
@@ -406,6 +392,7 @@ export const subscribeToAdminSettings = (callback: (settings: AdminSettings) => 
 export const updateAdminSettings = async (settings: Partial<AdminSettings>) => {
   await setDoc(doc(db, "settings", "chat"), settings, { merge: true });
 };
+
 
 export const exportConversation = async (conversation: Conversation, messages: Message[]) => {
   const content = {

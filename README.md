@@ -30,5 +30,3 @@ Welcome to my personal portfolio website! This project showcases my journey as a
 To run this project locally, follow these steps:
 
 1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/your-username/myportfolio.git](https://github.com/your-username/myportfolio.git)

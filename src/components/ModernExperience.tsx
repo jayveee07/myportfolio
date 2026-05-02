@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, useInView } from 'motion/react';
-import { Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, Award, BookOpen, Briefcase } from 'lucide-react';
 import { useRef } from 'react';
 
 interface Experience {
@@ -58,8 +58,14 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
   const displayEducation = education && education.length > 0 ? education : DEFAULT_EDUCATION;
 
   return (
-    <section ref={ref} id="experience" className="py-24 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6">
+    <section ref={ref} id="experience" className="py-24 bg-slate-50 relative">
+      {/* Background Effects */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-gradient-to-b from-accent/5 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-gradient-to-t from-violet-500/5 to-transparent rounded-full blur-3xl" />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
         {/* Section Header */}
         <motion.div 
           className="text-center mb-16"
@@ -78,8 +84,11 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
 
         {/* Timeline */}
         <div className="relative">
-          {/* Vertical Line */}
-          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-accent via-violet-500 to-rose-500 hidden lg:block" />
+          {/* Animated Vertical Line with Glow */}
+          <div className="absolute left-1/2 top-0 bottom-0 w-px hidden lg:block">
+            <div className="absolute inset-0 bg-gradient-to-b from-accent via-violet-500 to-rose-500 opacity-30" />
+            <div className="absolute inset-0 bg-gradient-to-b from-accent via-violet-500 to-rose-500 animate-pulse opacity-60 blur-sm" />
+          </div>
 
           <div className="space-y-12">
             {experience.map((exp, index) => (
@@ -92,7 +101,10 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
               >
                 {/* Content Card */}
                 <div className={`flex-1 ${index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'}`}>
-                  <div className="bg-white p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 group">
+                  <motion.div 
+                    className="bg-white p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 group"
+                    whileHover={{ y: -4 }}
+                  >
                     {/* Date Badge */}
                     <div className={`inline-flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent rounded-full text-sm font-semibold mb-4 ${index % 2 === 0 ? 'lg:ml-auto' : ''}`}>
                       <Calendar size={14} />
@@ -100,10 +112,11 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                     </div>
 
                     {/* Role & Company */}
-                    <h3 className="text-2xl font-display font-bold text-primary mb-2">
+                    <h3 className="text-2xl font-display font-bold text-primary mb-2 group-hover:text-accent transition-colors">
                       {exp.role}
                     </h3>
-                    <p className="text-slate-500 font-medium mb-4">
+                    <p className="text-slate-500 font-medium mb-4 flex items-center gap-2">
+                      <Briefcase size={16} className="text-accent/60" />
                       {exp.company}
                     </p>
 
@@ -111,17 +124,31 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                     <ul className="space-y-3">
                       {exp.description?.map((point, i) => (
                         <li key={i} className={`flex items-start gap-3 text-slate-600 ${index % 2 === 0 ? 'lg:flex-row-reverse' : ''}`}>
-                          <div className="w-2 h-2 bg-accent rounded-full mt-2 flex-shrink-0" />
+                          <div className="w-2 h-2 bg-accent rounded-full mt-2 flex-shrink-0 group-hover:scale-125 transition-transform" />
                           <span>{point}</span>
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </motion.div>
                 </div>
 
-                {/* Center Dot (Desktop) */}
-                <div className="hidden lg:flex w-6 h-6 bg-accent rounded-full items-center justify-center z-10 shadow-lg shadow-accent/30">
-                  <div className="w-2 h-2 bg-white rounded-full" />
+                {/* Center Glowing Dot (Desktop) */}
+                <div className="hidden lg:flex w-6 h-6 bg-white rounded-full items-center justify-center z-10 shadow-lg">
+                  <motion.div 
+                    className="w-4 h-4 bg-accent rounded-full"
+                    animate={{ 
+                      boxShadow: [
+                        '0 0 0 0 rgba(14, 165, 233, 0.4)',
+                        '0 0 0 8px rgba(14, 165, 233, 0)',
+                        '0 0 0 0 rgba(14, 165, 233, 0)'
+                      ]
+                    }}
+                    transition={{ 
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: index * 0.3
+                    }}
+                  />
                 </div>
 
                 {/* Spacer */}
@@ -152,13 +179,14 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: 0.5 + index * 0.1, duration: 0.5 }}
-                className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all"
+                className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all group"
+                whileHover={{ y: -4 }}
               >
                 <div className="flex items-center gap-2 text-accent text-sm font-semibold mb-2">
-                  <Calendar size={14} />
+                  <BookOpen size={14} />
                   {edu.period}
                 </div>
-                <h4 className="text-lg font-display font-bold text-primary">
+                <h4 className="text-lg font-display font-bold text-primary group-hover:text-accent transition-colors">
                   {edu.degree}
                 </h4>
                 <p className="text-slate-500 text-sm mt-1">
@@ -168,7 +196,7 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                   <ul className="mt-3 space-y-1">
                     {edu.description.map((item, i) => (
                       <li key={i} className="flex items-start gap-2 text-slate-600 text-sm">
-                        <div className="w-1.5 h-1.5 bg-accent rounded-full mt-1.5 flex-shrink-0" />
+                        <div className="w-1.5 h-1.5 bg-accent rounded-full mt-1.5 flex-shrink-0 group-hover:scale-125 transition-transform" />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -187,13 +215,15 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
           animate={isInView ? { opacity: 1 } : {}}
           transition={{ delay: 0.5 }}
         >
-          <button 
+          <motion.button 
             onClick={onContact}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white rounded-2xl font-semibold hover:bg-slate-800 transition-all hover:scale-105"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white rounded-2xl font-semibold hover:bg-slate-800 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
            Let's Work Together
             <ArrowRight size={18} />
-          </button>
+          </motion.button>
         </motion.div>
       </div>
     </section>

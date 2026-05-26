@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
-import { useRef } from 'react';
+import { ModernAboutImageRotator } from './ModernAboutImageRotator';
 
 interface ModernAboutProps {
   profile: any;
@@ -17,6 +17,17 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
     "Process Automation",
   ];
 
+  const initials = `${profile?.name?.split(' ')[0]?.[0] || 'J'}V`;
+
+  // Support multiple possible future field names for DB image arrays.
+  // When you add your upload array in Firestore, you can rename/keep one of these.
+  const imageUrls: string[] =
+    (profile?.professionalImages as string[] | undefined) ||
+    (profile?.imageUrls as string[] | undefined) ||
+    (profile?.images as string[] | undefined) ||
+    (profile?.portfolioImages as string[] | undefined) ||
+    [];
+
   return (
     <section ref={ref} id="about" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6">
@@ -30,20 +41,15 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
           >
             {/* Decorative boxes */}
             <div className="relative w-full aspect-square max-w-md mx-auto">
-              {/* Main gradient box */}
-              <div className="absolute inset-0 bg-gradient-to-br from-accent via-violet-500 to-rose-500 rounded-3xl rotate-3 opacity-80" />
-              
-              {/* Secondary box */}
-              <div className="absolute inset-8 bg-white rounded-2xl shadow-2xl flex items-center justify-center">
-                <div className="text-center p-8">
-                  <div className="text-6xl font-display font-bold text-primary mb-2">
-                    {profile?.name?.split(' ')[0]?.[0] || 'J'}V
-                  </div>
-                  <div className="text-slate-400 text-sm uppercase tracking-wider">
-                    Portfolio
-                  </div>
-                </div>
-              </div>
+              {/* Main visual (auto-rotating + hover change) */}
+              <ModernAboutImageRotator
+                urls={imageUrls}
+                initials={initials}
+                className="absolute inset-0 rotate-3"
+              />
+
+              {/* Secondary “frame” box */}
+              <div className="absolute inset-8 bg-white rounded-2xl shadow-2xl" />
 
               {/* Floating badges */}
               <motion.div

@@ -11,10 +11,10 @@ import {
   setVisitorTypingStatus,
   Message as MessageType,
   Conversation
-} from '../lib/messaging';
+} from '../lib/supabase-messaging';
 import { getVisitorIp } from '../lib/ipService';
-import { auth, signInAsVisitor, recordVisit } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { recordVisit } from '../lib/supabase-data';
+import { useAuth } from '../context/SupabaseAuthContext';
 import { Pencil } from 'lucide-react';
 
 interface ChatWidgetProps {
@@ -29,9 +29,9 @@ interface ChatWidgetProps {
 let isFreshLogin = false;
 
 export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: ChatWidgetProps) => {
+  const { user, signInAnonymously } = useAuth();
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
-  const [user, setUser] = useState(auth.currentUser);
   const [visitorName, setVisitorName] = useState('');
   const [visitorEmail, setVisitorEmail] = useState('');
   const [visitorAvatar, setVisitorAvatar] = useState<string | null>(null);
@@ -75,35 +75,24 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
   }, [input, currentConvoId]);
 
   useEffect(() => {
-    // Fetch IP on mount
     getVisitorIp().then(setVisitorIp);
 
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      console.log("Auth State Changed:", u ? `User: ${u.uid}` : "Logged out");
-      setUser(u);
-      
-      const savedName = localStorage.getItem('visitor_name');
-      const savedEmail = localStorage.getItem('visitor_email');
-      const savedAvatar = localStorage.getItem('visitor_avatar');
-      const savedConvoId = localStorage.getItem('visitor_convo_id');
+    const savedName = localStorage.getItem('visitor_name');
+    const savedEmail = localStorage.getItem('visitor_email');
+    const savedAvatar = localStorage.getItem('visitor_avatar');
+    const savedConvoId = localStorage.getItem('visitor_convo_id');
 
-      // Only auto-resume in-widget if this specific tab session 
-      // just authorized (isFreshLogin)
-      if (u && isFreshLogin && savedName && savedEmail) {
-        setVisitorName(savedName);
-        setVisitorEmail(savedEmail);
-        if (savedAvatar) setVisitorAvatar(savedAvatar);
-        if (savedConvoId) setCurrentConvoId(savedConvoId);
-        setStep('chat');
-        // Removed redundant startConversation call here as handleStart manages the sequence
-      } else if (!isFreshLogin) {
-        // Ensure we always default to info step on fresh load
-        setStep('info');
-        setIsChatReady(false);
-      }
-    });
-    return () => unsub();
-  }, []);
+    if (user && isFreshLogin && savedName && savedEmail) {
+      setVisitorName(savedName);
+      setVisitorEmail(savedEmail);
+      if (savedAvatar) setVisitorAvatar(savedAvatar);
+      if (savedConvoId) setCurrentConvoId(savedConvoId);
+      setStep('chat');
+    } else if (!isFreshLogin) {
+      setStep('info');
+      setIsChatReady(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (step === 'chat' && isChatReady && (currentConvoId || visitorEmail)) {
@@ -159,52 +148,27 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
       localStorage.setItem('visitor_email', visitorEmail);
       localStorage.setItem('visitor_avatar', avatar);
       
-      // Re-trigger visit recording with the newly entered email
       recordVisit(window.location.pathname);
-      
-      // Implementation follows user request: Refresh anonymous session on start
-      if (!auth.currentUser || auth.currentUser.isAnonymous) {
-        console.log("Initializing/Refreshing visitor identity...");
-        await signInAsVisitor();
-        console.log("Identity established, UID:", auth.currentUser?.uid);
-      } else {
-        console.log("Admin session detected, bypassing visitor identity refresh. UID:", auth.currentUser.uid);
+
+      if (!user) {
+        await signInAnonymously();
       }
 
-      console.log("Establishing conversation record...");
-      // Ensure conversation exists and get its stable ID
       const convoId = await startConversation({ 
         name: effectiveName, 
         email: visitorEmail,
         ip: visitorIp
       });
-      console.log("Conversation established with ID:", convoId);
       
       localStorage.setItem('visitor_convo_id', convoId);
       setCurrentConvoId(convoId);
       setVisitorAvatar(avatar);
       setVisitorName(effectiveName);
-      // Robust delay for firestore rules propagation
-      console.log("Waiting for rules propagation...");
-      await new Promise(r => setTimeout(r, 1500));
       setIsChatReady(true);
       setStep('chat');
-      console.log("Chat setup complete.");
-    } catch (err: any) {
-      console.error("Chat Auth Error Detail:", {
-        code: err.code,
-        message: err.message,
-        stack: err.stack,
-        user: auth.currentUser?.uid
-      });
-      if (err.code === 'auth/admin-restricted-operation') {
-        setError("auth-disabled");
-      } else if (err.code === 'auth/network-request-failed') {
-        setError("Network error. Please check your internet connection.");
-      } else {
-        // Fallback to specific error message if available
-        setError(err.message || "Something went wrong. Please check your Firebase console or try again.");
-      }
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      setError(error.message || "Something went wrong. Please try again.");
     }
   };
 
@@ -230,9 +194,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
     const text = input.trim();
     setInput('');
     
-    // conversation is checked in handleStart, but guard here too
     const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
-    console.log("ChatWidget: handleSend using ID", convoId, "Auth status:", !!auth.currentUser);
     
     try {
       await sendMessage(convoId, text, { 
@@ -241,29 +203,17 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
         ip: visitorIp,
         avatar: visitorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(visitorName || 'G')}&background=3b82f6&color=fff`
       });
-    } catch (err: any) {
-      console.error("Failed to send message:", err);
-      let errorMsg = "Something went wrong. Please try again.";
-      
-      try {
-        const detail = JSON.parse(err.message);
-        console.error("Detailed Chat Error:", detail);
-        errorMsg = `Permission Denied: ${detail.operationType} on ${detail.path}`;
-      } catch {
-        errorMsg = err.message || errorMsg;
-      }
-      
-      setError(errorMsg);
-      // Automatically clear message-related error after 5s
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || "Something went wrong. Please try again.");
       setTimeout(() => setError(null), 5000);
     }
   };
 
   const handleStartEdit = (msg: MessageType) => {
-    // Only allow editing own messages (by email)
     if (msg.senderId !== visitorEmail) return;
     
-    const created = msg.createdAt?.toMillis ? msg.createdAt.toMillis() : Date.now();
+    const created = msg.createdAt ? new Date(msg.createdAt).getTime() : Date.now();
     const now = Date.now();
     
     if (now - created > 10 * 60 * 1000) {
@@ -339,7 +289,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
             whileTap={{ scale: 0.95 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={onOpen}
-            className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-14 h-14 bg-primary text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-[300] flex items-center justify-center hover:bg-slate-800 transition-all duration-300 group`}
+            className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-14 h-14 bg-btn text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-[300] flex items-center justify-center hover:bg-slate-800 transition-all duration-300 group`}
           >
             <MessageSquare size={24} className="group-hover:rotate-6 transition-transform" />
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full border-2 border-white flex items-center justify-center">
@@ -355,7 +305,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
             initial={{ opacity: 0, y: 20, scale: 0.95, transformOrigin: 'bottom right' }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[620px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] z-[300] border border-slate-200/50 flex flex-col overflow-hidden transition-all duration-300`}
+            className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[620px] bg-surface rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] z-[300] border border-border/50 flex flex-col overflow-hidden transition-all duration-300`}
           >
           {/* Header */}
           <div className="bg-primary px-6 py-8 text-white flex items-center justify-between relative overflow-hidden shrink-0">
@@ -464,7 +414,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
 
                     <button
                       type="submit"
-                      className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all text-sm shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] mt-2 active:shadow-inner"
+                      className="w-full bg-btn text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all text-sm shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] mt-2 active:shadow-inner"
                     >
                       Start messaging
                     </button>
@@ -486,7 +436,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
                     </div>
                   )}
                   {messages
-                    .filter(m => !m.deletedBy?.includes(visitorEmail))
+                    .filter(m => !m.isDeleted && !m.deletedBy?.includes(visitorEmail.toLowerCase()))
                     .map((msg, i) => (
                       <div 
                         key={msg.id || i} 
@@ -530,10 +480,10 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
                             </div>
                           </div>
                         ) : (
-                          <div className={`relative px-5 py-3.5 text-[13px] font-bold shadow-sm transition-all group-hover:shadow-md hover:scale-[1.01] overflow-hidden ${
+                          <div className={`relative px-5 py-3.5 text-[13px] font-bold shadow-sm transition-all group-hover:shadow-md overflow-hidden ${
                             msg.isDeleted ? 'bg-slate-100 text-slate-400 italic font-medium' :
                             msg.senderId === visitorEmail 
-                              ? 'bg-primary text-white rounded-[1.5rem] rounded-tr-[0.25rem]' 
+                              ? 'bg-btn text-white rounded-[1.5rem] rounded-tr-[0.25rem]' 
                               : 'bg-white border border-slate-200 text-slate-700 rounded-[1.5rem] rounded-tl-[0.25rem]'
                           }`}>
                             <p className="leading-[1.6] whitespace-pre-wrap">{msg.isDeleted ? "This message was deleted" : msg.text}</p>
@@ -609,7 +559,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
                             <span className="uppercase text-[9px] italic bg-slate-100 px-1.5 rounded-md text-slate-500">Edited</span>
                           )}
                           <span className="font-mono">
-                            {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
+                            {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
                           </span>
                           {msg.senderId === visitorEmail && (
                             <div className="flex">
@@ -660,7 +610,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
 
           {/* Footer */}
           {step === 'chat' && (
-            <div className="p-6 bg-white border-t border-slate-100 flex flex-col gap-3 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
+            <div className="p-6 bg-surface border-t border-border flex flex-col gap-3 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
               {isBlocked ? (
                 <div className="bg-red-50 text-red-600 p-4 rounded-2xl border border-red-100 flex items-center gap-3">
                   <Ban size={18} className="shrink-0" />
@@ -697,7 +647,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
                 <button
                   type="submit"
                   disabled={!input.trim()}
-                  className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 shadow-xl shadow-primary/10 hover:shadow-primary/20 shrink-0"
+                  className="w-12 h-12 bg-btn text-white rounded-2xl flex items-center justify-center hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90 shadow-xl shadow-primary/10 hover:shadow-primary/20 shrink-0"
                 >
                   <Send size={20} className={input.trim() ? "translate-x-0.5 -translate-y-0.5" : ""} />
                 </button>
@@ -728,7 +678,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            className="relative w-full max-w-[320px] bg-white rounded-[2rem] shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center border border-slate-100"
+            className="relative w-full max-w-[320px] bg-surface rounded-[2rem] shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center border border-border"
           >
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${confirmModal.type === 'delete' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'}`}>
               {confirmModal.type === 'delete' ? <Trash2 size={24} /> : <X size={24} />}

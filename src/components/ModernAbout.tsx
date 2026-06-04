@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
 import { ModernAboutImageRotator } from './ModernAboutImageRotator';
+import type { Profile } from '../types/portfolio';
 
 interface ModernAboutProps {
-  profile: any;
+  profile: Profile;
 }
 
 export const ModernAbout = ({ profile }: ModernAboutProps) => {
@@ -19,17 +20,15 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
 
   const initials = `${profile?.name?.split(' ')[0]?.[0] || 'J'}V`;
 
-  // Support multiple possible future field names for DB image arrays.
-  // When you add your upload array in Firestore, you can rename/keep one of these.
   const imageUrls: string[] =
-    (profile?.professionalImages as string[] | undefined) ||
-    (profile?.imageUrls as string[] | undefined) ||
-    (profile?.images as string[] | undefined) ||
-    (profile?.portfolioImages as string[] | undefined) ||
-    [];
+    profile?.professionalImages?.length
+      ? profile.professionalImages
+      : profile?.photoUrl
+        ? [profile.photoUrl]
+        : [];
 
   return (
-    <section ref={ref} id="about" className="py-24 bg-white">
+    <section ref={ref} id="about" className="py-24 bg-surface">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left - Image/Visual */}
@@ -48,8 +47,7 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
                 className="absolute inset-0 rotate-3"
               />
 
-              {/* Secondary “frame” box */}
-              <div className="absolute inset-8 bg-white rounded-2xl shadow-2xl" />
+
 
               {/* Floating badges */}
               <motion.div
@@ -65,7 +63,7 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: 0.5, duration: 0.6 }}
-                className="absolute -left-4 bottom-16 px-4 py-2 bg-primary rounded-xl shadow-lg"
+                className="absolute -left-4 bottom-16 px-4 py-2 bg-btn rounded-xl shadow-lg"
               >
                 <div className="text-xs font-semibold text-white uppercase">Open to Work</div>
               </motion.div>
@@ -84,7 +82,7 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
               <span className="gradient-text">Real Solutions</span>
             </h2>
             
-            <p className="text-slate-500 text-lg leading-relaxed mb-8">
+            <p                 className="text-secondary text-lg leading-relaxed mb-8">
               {profile?.bio || "I'm a results-driven IT professional with experience in software development, data operations, technical support, and financial systems. Proven ability to analyze large datasets, troubleshoot system issues, and develop high-accuracy web applications in fast-paced environments."}
             </p>
 
@@ -93,10 +91,10 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
               {highlights.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl"
+                  className="flex items-center gap-3 px-4 py-3 bg-surface-alt rounded-xl"
                 >
                   <div className="w-2 h-2 bg-accent rounded-full" />
-                  <span className="text-sm font-medium text-slate-700">{item}</span>
+                  <span className="text-sm font-medium text-secondary">{item}</span>
                 </div>
               ))}
             </div>
@@ -104,15 +102,15 @@ export const ModernAbout = ({ profile }: ModernAboutProps) => {
             {/* Quick Info */}
             <div className="flex flex-wrap gap-6 text-sm">
               <div>
-                <span className="text-slate-400 block">Location</span>
+                <span className="text-muted block">Location</span>
                 <span className="font-medium text-primary">{profile?.location || 'Quezon City, Philippines'}</span>
               </div>
               <div>
-                <span className="text-slate-400 block">Email</span>
+                <span className="text-muted block">Email</span>
                 <span className="font-medium text-primary">{profile?.email || 'jvpaisan@gmail.com'}</span>
               </div>
               <div>
-                <span className="text-slate-400 block">Languages</span>
+                <span className="text-muted block">Languages</span>
                 <span className="font-medium text-primary">{(profile?.languages || []).join(', ') || 'English, Filipino'}</span>
               </div>
             </div>

@@ -24,41 +24,12 @@ interface ModernExperienceProps {
   onContact: () => void;
 }
 
-const DEFAULT_EDUCATION = [
-  {
-    degree: "Bachelor of Science: Information Systems",
-    school: "Advance Central College",
-    period: "Graduated 2022",
-    description: [
-      "Graduated with honors",
-      "Programmer of the Year: Recognized for top-tier coding proficiency and technical performance",
-      "Best Capstone Project: Led development of a system solution recognized for innovation and applicability",
-      "Core focus on web development and database systems",
-      "Active member of the college tech club"
-    ]
-  },
-  {
-    degree: "Java Programming NCIII",
-    school: "TESDA",
-    period: "Certified",
-    description: ["Finisher of TESDA Java Programming NCIII"]
-  },
-  {
-    degree: "Visual Graphic Design NCIII",
-    school: "TESDA",
-    period: "Certified",
-    description: ["Technical Education and Skills Development Authority (NCIII)"]
-  }
-];
-
-
 export const ModernExperience = ({ experience, education, onContact }: ModernExperienceProps) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const displayEducation = education && education.length > 0 ? education : DEFAULT_EDUCATION;
 
   return (
-    <section ref={ref} id="experience" className="py-24 bg-slate-50">
+    <section ref={ref} id="experience" className="py-24 bg-surface-alt">
       <div className="max-w-7xl mx-auto px-6">
         {/* Section Header */}
         <motion.div 
@@ -71,7 +42,7 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
           <h2 className="text-4xl sm:text-5xl font-display font-bold text-primary mt-3 mb-4">
             Work Experience
           </h2>
-          <p className="text-slate-500 max-w-xl mx-auto">
+          <p className="text-secondary max-w-xl mx-auto">
             My journey through various roles and companies, building expertise in software development.
           </p>
         </motion.div>
@@ -92,7 +63,7 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
               >
                 {/* Content Card */}
                 <div className={`flex-1 ${index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'}`}>
-                  <div className="bg-white p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 group">
+                  <div className="bg-card p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 group">
                     {/* Date Badge */}
                     <div className={`inline-flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent rounded-full text-sm font-semibold mb-4 ${index % 2 === 0 ? 'lg:ml-auto' : ''}`}>
                       <Calendar size={14} />
@@ -103,14 +74,14 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                     <h3 className="text-2xl font-display font-bold text-primary mb-2">
                       {exp.role}
                     </h3>
-                    <p className="text-slate-500 font-medium mb-4">
+                    <p className="text-secondary font-medium mb-4">
                       {exp.company}
                     </p>
 
                     {/* Description */}
                     <ul className="space-y-3">
                       {exp.description?.map((point, i) => (
-                        <li key={i} className={`flex items-start gap-3 text-slate-600 ${index % 2 === 0 ? 'lg:flex-row-reverse' : ''}`}>
+                        <li key={i} className={`flex items-start gap-3 text-secondary ${index % 2 === 0 ? 'lg:flex-row-reverse' : ''}`}>
                           <div className="w-2 h-2 bg-accent rounded-full mt-2 flex-shrink-0" />
                           <span>{point}</span>
                         </li>
@@ -133,6 +104,7 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
 
         {/* Education Section */}
         <motion.div 
+          id="education"
           className="mt-20"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -146,13 +118,13 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {displayEducation?.map((edu, index) => (
+            {education?.map((edu, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: 0.5 + index * 0.1, duration: 0.5 }}
-                className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all"
+                className="bg-card p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all"
               >
                 <div className="flex items-center gap-2 text-accent text-sm font-semibold mb-2">
                   <Calendar size={14} />
@@ -161,13 +133,13 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                 <h4 className="text-lg font-display font-bold text-primary">
                   {edu.degree}
                 </h4>
-                <p className="text-slate-500 text-sm mt-1">
+                <p className="text-secondary text-sm mt-1">
                   {edu.school}
                 </p>
                 {edu.description && edu.description.length > 0 && (
                   <ul className="mt-3 space-y-1">
                     {edu.description.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-slate-600 text-sm">
+                      <li key={i} className="flex items-start gap-2 text-secondary text-sm">
                         <div className="w-1.5 h-1.5 bg-accent rounded-full mt-1.5 flex-shrink-0" />
                         <span>{item}</span>
                       </li>
@@ -189,7 +161,7 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
         >
           <button 
             onClick={onContact}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white rounded-2xl font-semibold hover:bg-slate-800 transition-all hover:scale-105"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-btn text-white rounded-2xl font-semibold hover:bg-slate-800 transition-all hover:scale-105"
           >
            Let's Work Together
             <ArrowRight size={18} />

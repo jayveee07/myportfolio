@@ -1,22 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Menu, X, Mail } from 'lucide-react';
+import { Menu, X, Mail, Sun, Moon } from 'lucide-react';
 import { SiteLogo } from './Logo';
-
-const Github = (props: any) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.2-.3 2.4 0 3.5-.73 1.02-1.08 2.25-1 3.5 0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" />
-  </svg>
-);
-
-const Linkedin = (props: any) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect width="4" height="12" x="2" y="9" /><circle cx="4" cy="4" r="2" />
-  </svg>
-);
+import { Github, Linkedin } from '../lib/icons';
+import { useTheme } from '../context/ThemeContext';
+import type { Profile } from '../types/portfolio';
 
 interface ModernNavProps {
-  profile: any;
+  profile: Profile;
   onChat: () => void;
   onEmail: () => void;
 }
@@ -24,20 +15,44 @@ interface ModernNavProps {
 export const ModernNav = ({ profile, onChat, onEmail }: ModernNavProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('');
+  const { theme, toggle } = useTheme();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: '-40% 0px -55% 0px' }
+    );
+
+    const sectionIds = ['about', 'skills', 'experience', 'education', 'projects', 'testimonials', 'blog'];
+    sectionIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const navLinks = [
     { label: 'About', href: '#about' },
-    { label: 'Experience', href: '#experience' },
     { label: 'Skills', href: '#skills' },
+    { label: 'Experience', href: '#experience' },
+    { label: 'Education', href: '#education' },
     { label: 'Projects', href: '#projects' },
+    { label: 'Testimonials', href: '#testimonials' },
+    { label: 'Blog', href: '#blog' },
   ];
 
 const socialLinks = [
@@ -50,7 +65,7 @@ const socialLinks = [
       {/* Desktop Navigation */}
       <motion.nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled ? 'bg-white/90 backdrop-blur-md shadow-lg' : 'bg-transparent'
+          isScrolled ? 'bg-surface/90 backdrop-blur-md shadow-lg' : 'bg-transparent'
         }`}
         initial={{ y: -100 }}
         animate={{ y: 0 }}
@@ -66,18 +81,35 @@ const socialLinks = [
               <a
                 key={link.label}
                 href={link.href}
-                className="text-slate-600 hover:text-accent font-medium transition-colors"
+                className={`relative text-sm font-medium transition-colors ${
+                  activeSection === link.href.slice(1)
+                    ? 'text-accent'
+                    : 'text-secondary hover:text-accent'
+                }`}
               >
                 {link.label}
+                {activeSection === link.href.slice(1) && (
+                  <motion.div
+                    layoutId="nav-indicator"
+                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent rounded-full"
+                  />
+                )}
               </a>
             ))}
           </div>
 
           {/* Social & CTA */}
           <div className="hidden md:flex items-center gap-4">
-{socialLinks.map((social, index) => (
+            <button
+              onClick={toggle}
+              className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-accent hover:bg-accent/10 rounded-xl transition-all"
+              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+{socialLinks.map((social) => (
               <a
-                key={index}
+                key={social.label}
                 href={social.href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -95,7 +127,7 @@ const socialLinks = [
             </button>
             <button 
               onClick={onChat}
-              className="px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-slate-800 transition-all"
+              className="px-5 py-2.5 bg-btn text-white rounded-xl font-medium hover:bg-slate-800 transition-all"
             >
               Let's Talk
             </button>
@@ -118,7 +150,7 @@ const socialLinks = [
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
-            className="fixed inset-0 z-50 bg-white md:hidden"
+            className="fixed inset-0 z-50 bg-surface md:hidden"
           >
             <div className="flex flex-col h-full p-6">
               {/* Header */}
@@ -139,7 +171,11 @@ const socialLinks = [
                     key={link.label}
                     href={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-4xl font-display font-bold text-primary"
+                    className={`text-4xl font-display font-bold transition-colors ${
+                      activeSection === link.href.slice(1)
+                        ? 'text-accent'
+                        : 'text-primary'
+                    }`}
                   >
                     {link.label}
                   </a>
@@ -148,20 +184,27 @@ const socialLinks = [
 
 {/* Social Links */}
               <div className="mt-auto flex gap-4">
-                {socialLinks.map((social, index) => (
+                {socialLinks.map((social) => (
                   <a
-                    key={index}
+                    key={social.label}
                     href={social.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-xl"
+                    className="w-12 h-12 flex items-center justify-center bg-tag rounded-xl"
                   >
                     <social.icon size={20} />
                   </a>
                 ))}
                 <button
+                  onClick={toggle}
+                  className="w-12 h-12 flex items-center justify-center bg-tag rounded-xl text-secondary hover:text-accent transition-all"
+                  title="Toggle theme"
+                >
+                  {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+                </button>
+                <button
                   onClick={() => { onEmail(); setIsMobileMenuOpen(false); }}
-                  className="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-xl text-slate-700 hover:text-accent transition-all"
+                  className="w-12 h-12 flex items-center justify-center bg-tag rounded-xl text-secondary hover:text-accent transition-all"
                   title="Contact"
                 >
                   <Mail size={20} />

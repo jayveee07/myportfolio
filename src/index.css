@@ -11,21 +11,47 @@
   --color-accent-dark: #0284c7;
   --color-bg: #fdfdfd;
   --color-line: #e5e7eb;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8fafc;
+  --color-card: #ffffff;
+  --color-tag: #f1f5f9;
+  --color-secondary: #64748b;
+  --color-muted: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-footer: #0a0a0c;
+  --color-btn: #0a0a0c;
+}
+
+.dark {
+  --color-primary: #f1f5f9;
+  --color-accent: #38bdf8;
+  --color-accent-dark: #0ea5e9;
+  --color-bg: #0a0a0c;
+  --color-line: #1e293b;
+  --color-surface: #0f172a;
+  --color-surface-alt: #020617;
+  --color-card: #1e293b;
+  --color-tag: #334155;
+  --color-secondary: #94a3b8;
+  --color-muted: #64748b;
+  --color-border: #1e293b;
+  --color-footer: #0f172a;
+  --color-btn: #0a0a0c;
 }
 
 @layer base {
   body {
-    @apply bg-bg text-slate-800 font-sans selection:bg-accent selection:text-white antialiased overflow-x-hidden transition-colors duration-500;
+    @apply bg-bg text-primary font-sans selection:bg-accent selection:text-white antialiased overflow-x-hidden transition-colors duration-500;
     background-image: 
       radial-gradient(circle at 2px 2px, var(--color-line) 1px, transparent 0);
     background-size: 32px 32px;
     position: relative;
   }
 
-  body::before {
-    content: "";
-    @apply fixed inset-0 opacity-[0.03] z-[1000] pointer-events-none;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  .dark body,
+  .dark .bg-white,
+  .dark .bg-slate-50 {
+    transition: background-color 0.5s ease, color 0.5s ease;
   }
 }
 
@@ -184,4 +210,15 @@
 /* Skeleton Loading */
 .skeleton {
   @apply animate-pulse bg-slate-200 rounded;
+}
+
+/* 3D Tilt Card */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.1s ease-out;
+  will-change: transform;
+}
+
+.tilt-card:hover {
+  z-index: 10;
 }

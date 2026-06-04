@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, Mail, MapPin, CheckCircle, Shield, Loader2, Copy, ExternalLink } from 'lucide-react';
-import { submitInquiry } from '../lib/firebase';
+import { submitInquiry } from '../lib/supabase-data';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
   const [emailError, setEmailError] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
-  const WEB3FORMS_ACCESS_KEY = 'f1122fde-ca48-4c2a-8652-c162845b2a33';
+  const WEB3FORMS_ACCESS_KEY = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -113,10 +113,10 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-line flex flex-col md:flex-row"
+            className="relative w-full max-w-2xl bg-surface rounded-[2.5rem] shadow-2xl overflow-hidden border border-line flex flex-col md:flex-row"
           >
             {/* Sidebar info */}
-            <div className="w-full md:w-72 bg-slate-50 p-10 border-b md:border-b-0 md:border-r border-line flex flex-col justify-between">
+            <div className="w-full md:w-72 bg-surface-alt p-10 border-b md:border-b-0 md:border-r border-line flex flex-col justify-between">
               <div>
                 <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white mb-8 shadow-lg shadow-primary/20">
                   <Mail size={20} />

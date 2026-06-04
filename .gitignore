@@ -6,3 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+/supabase/
+/dataconnect/
+/functions/
+/src/dataconnect-generated/
+.firebaserc
+firebase.json
+firebase-applet-config.json
+firestore.*
+*.rules
+*.indexes.json

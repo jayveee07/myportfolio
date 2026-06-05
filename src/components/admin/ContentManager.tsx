@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { getExperience, getSkills, getEducation, getProjects, createExperience, updateExperience, deleteExperience, createSkill, updateSkill, deleteSkill, createEducation, updateEducation, deleteEducation, createProject, updateProject, deleteProject } from '../../lib/supabase-data';
-import { subscribeToAdminSettings, updateAdminSettings } from '../../lib/supabase-messaging';
 import type { Experience, SkillGroup, Education, Project } from '../../types/portfolio';
 
-type Tab = 'experiences' | 'skills' | 'education' | 'projects' | 'footer';
+type Tab = 'experiences' | 'skills' | 'education' | 'projects';
 
 interface ModalState {
   open: boolean;
@@ -20,7 +19,6 @@ const emptyForm = (tab: Tab): Record<string, unknown> => {
     case 'skills': return { category: '', items: [''], order: 0 };
     case 'education': return { school: '', degree: '', period: '', description: [''], order: 0 };
     case 'projects': return { title: '', description: '', tech_stack: [''], featured: false, link: '', github: '' };
-    case 'footer': return {};
   }
 };
 
@@ -33,14 +31,6 @@ export const ContentManager = () => {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>({ open: false, type: 'create', tab: 'experiences', item: {} });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [footer, setFooter] = useState({
-    builtWith: '',
-    footerHeadingTop: '',
-    footerHeadingAccent: '',
-    footerHeadingBottom: '',
-    footerSubtitle: '',
-    footerCta: '',
-  });
 
   const load = async () => {
     setLoading(true);
@@ -56,21 +46,7 @@ export const ContentManager = () => {
 
   useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    const unsub = subscribeToAdminSettings((settings) => {
-      setFooter({
-        builtWith: settings.builtWith || '',
-        footerHeadingTop: settings.footerHeadingTop || '',
-        footerHeadingAccent: settings.footerHeadingAccent || '',
-        footerHeadingBottom: settings.footerHeadingBottom || '',
-        footerSubtitle: settings.footerSubtitle || '',
-        footerCta: settings.footerCta || '',
-      });
-    });
-    return () => unsub();
-  }, []);
-
-  const dataMap: Record<Tab, unknown[]> = { experiences, skills, education, projects, footer: [] };
+  const dataMap: Record<Tab, unknown[]> = { experiences, skills, education, projects };
   const currentData = dataMap[tab] as Record<string, unknown>[];
 
   const openCreate = (t: Tab) => setModal({ open: true, type: 'create', tab: t, item: emptyForm(t) });
@@ -121,53 +97,7 @@ export const ContentManager = () => {
     { key: 'skills', label: 'Skills' },
     { key: 'education', label: 'Education' },
     { key: 'projects', label: 'Projects' },
-    { key: 'footer', label: 'Footer' },
   ];
-
-  const updateFooter = (key: string, val: string) => {
-    const next = { ...footer, [key]: val };
-    setFooter(next);
-    updateAdminSettings({ [key]: val });
-  };
-
-  const renderContent = () => {
-    if (tab === 'footer') {
-      return (
-        <div className="bg-surface rounded-2xl border border-border p-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-black text-primary mb-1">Left Side — CTA</h3>
-            <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Heading & Call-to-action</p>
-          </div>
-          <div className="grid gap-5 mb-8">
-            <Input label="Heading (first part)" value={footer.footerHeadingTop} onChange={v => updateFooter('footerHeadingTop', v)} placeholder="Let's Build" />
-            <Input label="Heading (accent word)" value={footer.footerHeadingAccent} onChange={v => updateFooter('footerHeadingAccent', v)} placeholder="Something" />
-            <Input label="Heading (last part)" value={footer.footerHeadingBottom} onChange={v => updateFooter('footerHeadingBottom', v)} placeholder="Great" />
-            <Textarea label="Subtitle" value={footer.footerSubtitle} onChange={v => updateFooter('footerSubtitle', v)} placeholder="I'm always open to discussing new projects..." />
-            <Input label="Button Text" value={footer.footerCta} onChange={v => updateFooter('footerCta', v)} placeholder="Start a Conversation" />
-          </div>
-
-          <div className="h-px bg-border mb-6" />
-
-          <div className="mb-6">
-            <h3 className="text-lg font-black text-primary mb-1">Bottom Bar</h3>
-            <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">Built with credit</p>
-          </div>
-          <Input label="Built With" value={footer.builtWith} onChange={v => updateFooter('builtWith', v)} placeholder="React, Tailwind CSS & Supabase" />
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">{renderTable()}</div>
-        {(currentData as any[]).length === 0 && (
-          <div className="p-12 text-center">
-            <p className="text-sm font-bold text-secondary">No {tab} yet. Click "Add" to create one.</p>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const renderTable = () => {
     switch (tab) {
@@ -310,11 +240,9 @@ export const ContentManager = () => {
           <h1 className="text-3xl font-black text-primary mb-2">Content Manager</h1>
           <p className="text-secondary font-bold">Manage your portfolio content</p>
         </div>
-        {tab !== 'footer' && (
-          <button onClick={() => openCreate(tab)} className="flex items-center gap-2 px-5 py-3 bg-accent text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-accent/90 transition-all shadow-lg shadow-accent/20">
-            <Plus size={16} /> Add {tab.slice(0, -1)}
-          </button>
-        )}
+        <button onClick={() => openCreate(tab)} className="flex items-center gap-2 px-5 py-3 bg-accent text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-accent/90 transition-all shadow-lg shadow-accent/20">
+          <Plus size={16} /> Add {tab.slice(0, -1)}
+        </button>
       </div>
 
       <div className="flex gap-1 bg-surface-alt/80 p-1.5 rounded-2xl mb-6 border border-border/50 w-fit">
@@ -331,7 +259,14 @@ export const ContentManager = () => {
         ))}
       </div>
 
-      {renderContent()}
+      <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+        <div className="overflow-x-auto">{renderTable()}</div>
+        {(currentData as any[]).length === 0 && (
+          <div className="p-12 text-center">
+            <p className="text-sm font-bold text-secondary">No {tab} yet. Click "Add" to create one.</p>
+          </div>
+        )}
+      </div>
 
       <AnimatePresence>
         {modal.open && (

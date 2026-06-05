@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Eye, EyeOff, X, Plus, Loader2, Trash2, GripVertical, ImageIcon, Upload } from 'lucide-react';
 import { getProfile, updateProfile, uploadProfessionalImage } from '../../lib/supabase-data';
+import { subscribeToAdminSettings, updateAdminSettings } from '../../lib/supabase-messaging';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Profile } from '../../types/portfolio';
 
@@ -30,7 +31,7 @@ export const AdminAbout = () => {
     location: '', languages: [], resumeUrl: '', githubUrl: '',
     linkedinUrl: '', photoUrl: '', professionalImages: [],
   });
-  const [tab, setTab] = useState<'profile' | 'photos' | 'sections'>('profile');
+  const [tab, setTab] = useState<'profile' | 'photos' | 'sections' | 'footer'>('profile');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -41,6 +42,29 @@ export const AdminAbout = () => {
   const imagesInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef(form);
   formRef.current = form;
+
+  const [footer, setFooter] = useState({
+    builtWith: '',
+    footerHeadingTop: '',
+    footerHeadingAccent: '',
+    footerHeadingBottom: '',
+    footerSubtitle: '',
+    footerCta: '',
+  });
+
+  useEffect(() => {
+    const unsub = subscribeToAdminSettings((settings) => {
+      setFooter({
+        builtWith: settings.builtWith || '',
+        footerHeadingTop: settings.footerHeadingTop || '',
+        footerHeadingAccent: settings.footerHeadingAccent || '',
+        footerHeadingBottom: settings.footerHeadingBottom || '',
+        footerSubtitle: settings.footerSubtitle || '',
+        footerCta: settings.footerCta || '',
+      });
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (profile) setForm(profile);
@@ -195,7 +219,7 @@ export const AdminAbout = () => {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-8 bg-surface-alt p-1 rounded-xl w-fit">
-        {(['profile', 'photos', 'sections'] as const).map(t => (
+        {(['profile', 'photos', 'sections', 'footer'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -203,7 +227,7 @@ export const AdminAbout = () => {
               tab === t ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'
             }`}
           >
-            {t === 'profile' ? 'Profile' : t === 'photos' ? 'Photos' : 'Sections'}
+            {t === 'profile' ? 'Profile' : t === 'photos' ? 'Photos' : t === 'sections' ? 'Sections' : 'Footer'}
           </button>
         ))}
       </div>
@@ -424,6 +448,71 @@ export const AdminAbout = () => {
             })}
           </div>
         </SectionCard>
+      )}
+
+      {tab === 'footer' && (
+        <div className="grid gap-8">
+          <SectionCard title="Left Side — CTA">
+            <p className="text-sm text-secondary mb-4">All fields update the site footer in real time.</p>
+            <div className="grid gap-5">
+              <Field label="Heading (first part)">
+                <input value={footer.footerHeadingTop} onChange={e => { const v = e.target.value; setFooter(f => ({ ...f, footerHeadingTop: v })); updateAdminSettings({ footerHeadingTop: v }); }}
+                  placeholder="Let's Build"
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+              <Field label="Heading (accent word)">
+                <input value={footer.footerHeadingAccent} onChange={e => { const v = e.target.value; setFooter(f => ({ ...f, footerHeadingAccent: v })); updateAdminSettings({ footerHeadingAccent: v }); }}
+                  placeholder="Something"
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+              <Field label="Heading (last part)">
+                <input value={footer.footerHeadingBottom} onChange={e => { const v = e.target.value; setFooter(f => ({ ...f, footerHeadingBottom: v })); updateAdminSettings({ footerHeadingBottom: v }); }}
+                  placeholder="Great"
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+              <Field label="Subtitle">
+                <textarea value={footer.footerSubtitle} onChange={e => { const v = e.target.value; setFooter(f => ({ ...f, footerSubtitle: v })); updateAdminSettings({ footerSubtitle: v }); }}
+                  placeholder="I'm always open to discussing new projects..."
+                  rows={3}
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent resize-none" />
+              </Field>
+              <Field label="Button Text">
+                <input value={footer.footerCta} onChange={e => { const v = e.target.value; setFooter(f => ({ ...f, footerCta: v })); updateAdminSettings({ footerCta: v }); }}
+                  placeholder="Start a Conversation"
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Right Side — Contact Info">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Email">
+                <input value={form.email} onChange={e => set('email', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+              <Field label="Location">
+                <input value={form.location} onChange={e => set('location', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+              <Field label="GitHub URL">
+                <input value={form.githubUrl} onChange={e => set('githubUrl', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+              <Field label="LinkedIn URL">
+                <input value={form.linkedinUrl} onChange={e => set('linkedinUrl', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+              </Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Bottom Bar">
+            <Field label="Built With">
+              <input value={footer.builtWith} onChange={e => { const v = e.target.value; setFooter(f => ({ ...f, builtWith: v })); updateAdminSettings({ builtWith: v }); }}
+                placeholder="React, Tailwind CSS & Supabase"
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-accent" />
+            </Field>
+          </SectionCard>
+        </div>
       )}
     </div>
   );

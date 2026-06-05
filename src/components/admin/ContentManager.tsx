@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, FileText } from 'lucide-react';
 import { getExperience, getSkills, getEducation, getProjects, createExperience, updateExperience, deleteExperience, createSkill, updateSkill, deleteSkill, createEducation, updateEducation, deleteEducation, createProject, updateProject, deleteProject } from '../../lib/supabase-data';
+import { subscribeToAdminSettings, updateAdminSettings, type AdminSettings } from '../../lib/supabase-messaging';
 import type { Experience, SkillGroup, Education, Project } from '../../types/portfolio';
 
 type Tab = 'experiences' | 'skills' | 'education' | 'projects';
@@ -31,6 +32,7 @@ export const ContentManager = () => {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>({ open: false, type: 'create', tab: 'experiences', item: {} });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [builtWith, setBuiltWith] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -45,6 +47,13 @@ export const ContentManager = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToAdminSettings((settings) => {
+      if (settings.builtWith !== undefined) setBuiltWith(settings.builtWith);
+    });
+    return () => unsub();
+  }, []);
 
   const dataMap: Record<Tab, unknown[]> = { experiences, skills, education, projects };
   const currentData = dataMap[tab] as Record<string, unknown>[];
@@ -243,6 +252,24 @@ export const ContentManager = () => {
         <button onClick={() => openCreate(tab)} className="flex items-center gap-2 px-5 py-3 bg-accent text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-accent/90 transition-all shadow-lg shadow-accent/20">
           <Plus size={16} /> Add {tab.slice(0, -1)}
         </button>
+      </div>
+
+      <div className="bg-surface rounded-2xl border border-border p-6 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-indigo-500/10 text-indigo-500">
+            <FileText size={22} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-black text-primary">Footer — Built With</p>
+            <p className="text-[10px] text-secondary font-bold">Text shown at the bottom of your site footer.</p>
+          </div>
+          <input
+            value={builtWith}
+            onChange={e => { setBuiltWith(e.target.value); updateAdminSettings({ builtWith: e.target.value }); }}
+            placeholder="React, Tailwind CSS & Supabase"
+            className="w-80 bg-surface-alt border-2 border-border rounded-xl px-4 py-3 text-sm focus:border-accent/30 focus:outline-none font-bold transition-all"
+          />
+        </div>
       </div>
 
       <div className="flex gap-1 bg-surface-alt/80 p-1.5 rounded-2xl mb-6 border border-border/50 w-fit">

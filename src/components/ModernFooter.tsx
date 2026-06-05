@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, useInView } from 'motion/react';
 import { Mail, MapPin, ArrowRight } from 'lucide-react';
 import { Github, Linkedin } from '../lib/icons';
+import { subscribeToAdminSettings } from '../lib/supabase-messaging';
 import type { Profile } from '../types/portfolio';
 
 interface FooterProps {
@@ -13,6 +14,14 @@ interface FooterProps {
 export const ModernFooter = ({ profile, onChat, onEmail }: FooterProps) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [builtWith, setBuiltWith] = useState('React, Tailwind CSS & Supabase');
+
+  useEffect(() => {
+    const unsub = subscribeToAdminSettings((settings) => {
+      if (settings.builtWith) setBuiltWith(settings.builtWith);
+    });
+    return () => unsub();
+  }, []);
 
 const socialLinks = [
     { icon: Github, href: profile?.githubUrl, label: 'GitHub' },
@@ -110,7 +119,7 @@ const socialLinks = [
             © {new Date().getFullYear()} {profile?.name || 'John Vince Paisan'}. All rights reserved.
           </p>
           <p className="text-muted text-sm">
-            Built with React, Tailwind CSS & Firebase
+            Built with {builtWith}
           </p>
         </motion.div>
       </div>

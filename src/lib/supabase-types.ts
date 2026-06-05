@@ -173,6 +173,7 @@ export interface Database {
           online_status: string | null
           resume_url: string | null
           online_hours: string | null
+          built_with: string | null
         }
         Insert: Record<string, unknown>
         Update: Record<string, unknown>

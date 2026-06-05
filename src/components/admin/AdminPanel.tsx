@@ -198,6 +198,27 @@ const SettingsPage = () => {
             </label>
           </div>
         </div>
+
+        <div className="bg-surface rounded-2xl border border-border p-6">
+          <h2 className="text-lg font-black text-primary mb-4">Footer</h2>
+          <div className="bg-surface-alt rounded-3xl p-6 space-y-4">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-indigo-500/10 text-indigo-500">
+                <FileText size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-black text-primary">Built With</p>
+                <p className="text-[10px] text-secondary font-bold">Shown in the footer of your site.</p>
+              </div>
+            </div>
+            <input
+              value={adminSettings.builtWith || ''}
+              onChange={e => updateAdminSettings({ builtWith: e.target.value })}
+              placeholder="React, Tailwind CSS & Supabase"
+              className="w-full bg-surface border-2 border-border rounded-xl px-4 py-3 text-sm focus:border-accent/30 focus:outline-none font-bold transition-all"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

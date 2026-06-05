@@ -41,6 +41,7 @@ export interface AdminSettings {
   onlineStatus: 'online' | 'busy' | 'offline';
   resumeUrl?: string;
   onlineHours?: string;
+  builtWith?: string;
 }
 
 const mapMsg = (db: Record<string, unknown> | undefined | null): Message | null => {
@@ -96,6 +97,7 @@ const mapSettings = (db: Record<string, unknown> | undefined | null): AdminSetti
     onlineStatus: (db.online_status as 'online' | 'busy' | 'offline') || 'online',
     resumeUrl: db.resume_url as string | undefined,
     onlineHours: db.online_hours as string | undefined,
+    builtWith: db.built_with as string | undefined,
   };
 };
 
@@ -519,6 +521,7 @@ export const updateAdminSettings = async (settings: Partial<AdminSettings>) => {
   if (settings.onlineStatus !== undefined) db.online_status = settings.onlineStatus;
   if (settings.resumeUrl !== undefined) db.resume_url = settings.resumeUrl;
   if (settings.onlineHours !== undefined) db.online_hours = settings.onlineHours;
+  if (settings.builtWith !== undefined) db.built_with = settings.builtWith;
 
   await supabase.from('settings').upsert({ id: 'chat', ...db }, { onConflict: 'id' });
 };

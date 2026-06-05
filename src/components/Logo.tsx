@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Copy, Share2, Shield, ArrowUp } from 'lucide-react';
+import { Copy, Share2, ArrowUp } from 'lucide-react';
 
 // Importing the image allows Vite to process it, add a content hash for 
 // cache-busting, and provide the correct URL during deployment.

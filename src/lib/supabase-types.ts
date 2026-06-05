@@ -123,6 +123,7 @@ export interface Database {
           visitor_typing: boolean | null
           is_pinned: boolean | null
           is_blocked: boolean | null
+          is_deleted: boolean | null
           updated_at: string | null
           created_at: string | null
         }

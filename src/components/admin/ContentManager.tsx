@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pencil, Trash2, X, GripVertical, FlaskConical } from 'lucide-react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { getExperience, getSkills, getEducation, getProjects, createExperience, updateExperience, deleteExperience, createSkill, updateSkill, deleteSkill, createEducation, updateEducation, deleteEducation, createProject, updateProject, deleteProject } from '../../lib/supabase-data';
 import type { Experience, SkillGroup, Education, Project } from '../../types/portfolio';
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, MessageSquare, User, Check, CheckCheck, Mail, Trash2, Sparkles, Ban } from 'lucide-react';
+import { Send, X, MessageSquare, User, CheckCheck, Mail, Trash2, Sparkles, Ban } from 'lucide-react';
 import { 
   sendMessage, 
   subscribeToMessages, 
@@ -45,6 +45,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
   const [editInput, setEditInput] = useState('');
   const [visitorIp, setVisitorIp] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isAiMode, setIsAiMode] = useState(true);
   const [confirmModal, setConfirmModal] = useState<{ 
     type: 'delete' | 'discard-edit', 
     onConfirm: () => void, 
@@ -110,6 +111,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
       const unsub = subscribeToConversation(id, (convo) => {
         setAdminTyping(!!convo.adminTyping);
         setIsBlocked(!!convo.isBlocked);
+        setIsAiMode(convo.isAutoReplied !== false);
       });
       return () => unsub();
     }
@@ -327,11 +329,18 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
                   {step === 'chat' ? (visitorName || 'Guest') : "Chat Support"}
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <div className={`w-2 h-2 ${adminTyping ? 'bg-accent animate-pulse' : 'bg-green-400'} rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]`} />
-                  <span className="text-[10px] text-white/60 font-bold uppercase tracking-[0.15em] font-mono">
-                    {adminTyping ? 'Admin is typing...' : 'Active Now'}
-                  </span>
-                </div>
+                {isAiMode ? (
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-accent" />
+                    <span className="text-[10px] text-white/60 font-bold uppercase tracking-[0.15em] font-mono">AI Assistant</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
+                    <span className="text-[10px] text-white/60 font-bold uppercase tracking-[0.15em] font-mono">Human Agent</span>
+                  </div>
+                )}
+              </div>
               </div>
             </div>
             <button 
@@ -652,6 +661,13 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
                   <Send size={20} className={input.trim() ? "translate-x-0.5 -translate-y-0.5" : ""} />
                 </button>
               </form>
+              <div className="text-[9px] text-slate-400 font-mono text-center -mt-1">
+                {isAiMode ? (
+                  <span>Type <strong className="text-accent">"agent"</strong> to talk to a human</span>
+                ) : (
+                  <span>Type <strong className="text-accent">"ai"</strong> to talk to the AI assistant</span>
+                )}
+              </div>
                 </>
               )}
               <div className="flex justify-center pt-1 border-t border-slate-50">

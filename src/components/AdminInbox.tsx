@@ -1,7 +1,7 @@
 /** AdminInbox.tsx **/
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Inbox, Search, MessageSquare, Send, User, Clock, ArrowLeft, MoreVertical, LogOut, Eye, Mail, Sparkles, Sparkle, CheckCheck, Archive } from 'lucide-react';
+import { Inbox, Search, MessageSquare, Send, User, Clock, ArrowLeft, MoreVertical, Eye, Mail, Sparkles, Sparkle, CheckCheck, Archive } from 'lucide-react';
 import { 
   subscribeToConversations, 
   subscribeToMessages, 
@@ -24,7 +24,6 @@ import { ADMIN_EMAIL, ADMIN_NAME } from '../lib/supabase';
 import { subscribeToActiveVisitors } from '../lib/supabase-data';
 import { Pencil, X as CloseX, Trash2, Pin, Ban, Download, ShieldAlert } from 'lucide-react';
 import { suggestAdminResponse } from '../lib/gemini';
-import { SiteLogo } from './Logo';
 
 export interface Visit {
   id: string;
@@ -221,8 +220,8 @@ export const AdminInbox = ({ user }: { user: { email?: string } }) => {
   const handleGetAiSuggestion = async () => {
     if (!selectedConvo || messages.length === 0) return;
     
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
-      setError("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY is set in your .env file.");
+    if (!(typeof process !== 'undefined' && (process as any).env?.GEMINI_API_KEY)) {
+      setError("Gemini API Key is missing. Ensure GEMINI_API_KEY is set in your .env file.");
       return;
     }
 

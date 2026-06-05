@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Mail, MapPin, CheckCircle, Shield, Loader2, Copy, ExternalLink } from 'lucide-react';
+import { X, Mail, CheckCircle, Shield, Loader2, Copy, ExternalLink } from 'lucide-react';
 import { submitInquiry } from '../lib/supabase-data';
 
 interface ContactModalProps {

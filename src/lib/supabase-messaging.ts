@@ -140,34 +140,48 @@ export const sendMessage = async (
 
     updateData.unread_count = (convo?.unread_count || 0) + 1;
 
-    if (!convo?.is_auto_replied) {
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId)
-        .eq('sender_id', ADMIN_EMAIL);
+    const lowerText = text.toLowerCase().trim();
+    const switchToAgent = /^(agent|human|talk to human|talk to agent)\b/.test(lowerText);
+    const switchToAI = /^(ai|bot|talk to ai|talk to bot)\b/.test(lowerText);
 
-      if (!count || count === 0) {
-        const aiResponse = await generateChatResponse(text, visitorInfo.name);
-        const autoReplyText = aiResponse || "Thanks for reaching out! I've received your message and will get back to you shortly.";
+    if (switchToAgent) {
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        text: "🔄 You're now chatting with a human agent. An admin will respond shortly.",
+        sender_id: ADMIN_EMAIL,
+        sender_name: `${ADMIN_NAME} (AI)`,
+        sender_avatar: ADMIN_AVATAR,
+      });
+      updateData.is_auto_replied = false;
+      updateData.last_message = "🔄 Switched to human agent";
+    } else if (switchToAI) {
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        text: "🔄 Switching back to AI assistant. How can I help you?",
+        sender_id: ADMIN_EMAIL,
+        sender_name: `${ADMIN_NAME} (AI)`,
+        sender_avatar: ADMIN_AVATAR,
+      });
+      updateData.is_auto_replied = true;
+      updateData.last_message = "🔄 Switched to AI assistant";
+    } else if (convo?.is_auto_replied !== false) {
+      const aiResponse = await generateChatResponse(text, visitorInfo.name);
+      const autoReplyText = aiResponse || "Thanks for reaching out! I've received your message and will get back to you shortly.";
 
-        await supabase.from('messages').insert({
-          conversation_id: conversationId,
-          text: autoReplyText,
-          sender_id: ADMIN_EMAIL,
-          sender_name: `${ADMIN_NAME} (AI)`,
-          sender_avatar: ADMIN_AVATAR,
-        });
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        text: autoReplyText,
+        sender_id: ADMIN_EMAIL,
+        sender_name: `${ADMIN_NAME} (AI)`,
+        sender_avatar: ADMIN_AVATAR,
+      });
 
-        updateData.is_auto_replied = true;
-        updateData.last_message = autoReplyText;
-      } else {
-        updateData.is_auto_replied = true;
-      }
+      updateData.is_auto_replied = true;
+      updateData.last_message = autoReplyText;
     }
   } else {
     updateData.unread_count = 0;
-    updateData.is_auto_replied = true;
+    updateData.is_auto_replied = false;
   }
 
   await supabase
@@ -208,7 +222,7 @@ export const startConversation = async (visitorInfo: { name: string; email: stri
       participants,
       ...payload,
       unread_count: 0,
-      is_auto_replied: false,
+      is_auto_replied: true,
     });
 
     await supabase.from('messages').insert({

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
-import { Calendar, Clock, ArrowUpRight, Loader } from 'lucide-react';
+import { Calendar, Clock, ArrowUpRight } from 'lucide-react';
 import { ScrollReveal } from './ScrollReveal';
 import { useBlogPosts } from '../hooks/usePortfolioData';
 

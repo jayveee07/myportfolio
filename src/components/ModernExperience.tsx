@@ -1,6 +1,5 @@
-import React from 'react';
 import { motion, useInView } from 'motion/react';
-import { Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { Calendar, ArrowRight } from 'lucide-react';
 import { useRef } from 'react';
 
 interface Experience {

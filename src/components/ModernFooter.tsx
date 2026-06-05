@@ -14,11 +14,25 @@ interface FooterProps {
 export const ModernFooter = ({ profile, onChat, onEmail }: FooterProps) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [builtWith, setBuiltWith] = useState('React, Tailwind CSS & Supabase');
+  const [footerContent, setFooterContent] = useState({
+    builtWith: 'React, Tailwind CSS & Supabase',
+    footerHeadingTop: "Let's Build",
+    footerHeadingAccent: 'Something',
+    footerHeadingBottom: 'Great',
+    footerSubtitle: "I'm always open to discussing new projects, creative ideas, or opportunities to be part of your vision.",
+    footerCta: 'Start a Conversation',
+  });
 
   useEffect(() => {
     const unsub = subscribeToAdminSettings((settings) => {
-      if (settings.builtWith) setBuiltWith(settings.builtWith);
+      setFooterContent({
+        builtWith: settings.builtWith || footerContent.builtWith,
+        footerHeadingTop: settings.footerHeadingTop || footerContent.footerHeadingTop,
+        footerHeadingAccent: settings.footerHeadingAccent || footerContent.footerHeadingAccent,
+        footerHeadingBottom: settings.footerHeadingBottom || footerContent.footerHeadingBottom,
+        footerSubtitle: settings.footerSubtitle || footerContent.footerSubtitle,
+        footerCta: settings.footerCta || footerContent.footerCta,
+      });
     });
     return () => unsub();
   }, []);
@@ -39,17 +53,17 @@ const socialLinks = [
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl sm:text-6xl font-display font-bold leading-tight mb-6">
-              Let's Build <br />
-              <span className="text-accent">Something</span> Great
+              {footerContent.footerHeadingTop} <br />
+              <span className="text-accent">{footerContent.footerHeadingAccent}</span> {footerContent.footerHeadingBottom}
             </h2>
             <p className="text-muted text-lg mb-8 max-w-md">
-              I'm always open to discussing new projects, creative ideas, or opportunities to be part of your vision.
+              {footerContent.footerSubtitle}
             </p>
             <button 
               onClick={onChat}
               className="inline-flex items-center gap-3 px-8 py-5 bg-accent text-white rounded-2xl font-semibold hover:bg-accent/90 transition-all hover:scale-105"
             >
-              Start a Conversation
+              {footerContent.footerCta}
               <ArrowRight size={20} />
             </button>
           </motion.div>
@@ -119,7 +133,7 @@ const socialLinks = [
             © {new Date().getFullYear()} {profile?.name || 'John Vince Paisan'}. All rights reserved.
           </p>
           <p className="text-muted text-sm">
-            Built with {builtWith}
+            Built with {footerContent.builtWith}
           </p>
         </motion.div>
       </div>

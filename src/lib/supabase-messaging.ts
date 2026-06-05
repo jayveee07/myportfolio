@@ -42,6 +42,11 @@ export interface AdminSettings {
   resumeUrl?: string;
   onlineHours?: string;
   builtWith?: string;
+  footerHeadingTop?: string;
+  footerHeadingAccent?: string;
+  footerHeadingBottom?: string;
+  footerSubtitle?: string;
+  footerCta?: string;
 }
 
 const mapMsg = (db: Record<string, unknown> | undefined | null): Message | null => {
@@ -98,6 +103,11 @@ const mapSettings = (db: Record<string, unknown> | undefined | null): AdminSetti
     resumeUrl: db.resume_url as string | undefined,
     onlineHours: db.online_hours as string | undefined,
     builtWith: db.built_with as string | undefined,
+    footerHeadingTop: db.footer_heading_top as string | undefined,
+    footerHeadingAccent: db.footer_heading_accent as string | undefined,
+    footerHeadingBottom: db.footer_heading_bottom as string | undefined,
+    footerSubtitle: db.footer_subtitle as string | undefined,
+    footerCta: db.footer_cta as string | undefined,
   };
 };
 
@@ -522,6 +532,11 @@ export const updateAdminSettings = async (settings: Partial<AdminSettings>) => {
   if (settings.resumeUrl !== undefined) db.resume_url = settings.resumeUrl;
   if (settings.onlineHours !== undefined) db.online_hours = settings.onlineHours;
   if (settings.builtWith !== undefined) db.built_with = settings.builtWith;
+  if (settings.footerHeadingTop !== undefined) db.footer_heading_top = settings.footerHeadingTop;
+  if (settings.footerHeadingAccent !== undefined) db.footer_heading_accent = settings.footerHeadingAccent;
+  if (settings.footerHeadingBottom !== undefined) db.footer_heading_bottom = settings.footerHeadingBottom;
+  if (settings.footerSubtitle !== undefined) db.footer_subtitle = settings.footerSubtitle;
+  if (settings.footerCta !== undefined) db.footer_cta = settings.footerCta;
 
   await supabase.from('settings').upsert({ id: 'chat', ...db }, { onConflict: 'id' });
 };

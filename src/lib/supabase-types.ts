@@ -174,6 +174,11 @@ export interface Database {
           resume_url: string | null
           online_hours: string | null
           built_with: string | null
+          footer_heading_top: string | null
+          footer_heading_accent: string | null
+          footer_heading_bottom: string | null
+          footer_subtitle: string | null
+          footer_cta: string | null
         }
         Insert: Record<string, unknown>
         Update: Record<string, unknown>

@@ -186,9 +186,9 @@ export const AdminBlog = () => {
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="relative w-full max-w-xl bg-surface rounded-3xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-xl max-h-[90vh] bg-surface rounded-3xl shadow-2xl overflow-y-auto"
           >
-            <div className="p-8 border-b border-border flex items-center justify-between">
+            <div className="sticky top-0 z-10 p-8 border-b border-border bg-surface flex items-center justify-between">
               <h3 className="text-lg font-black text-primary">
                 {editing ? 'Edit Post' : 'New Blog Post'}
               </h3>

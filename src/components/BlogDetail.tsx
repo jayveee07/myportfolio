@@ -1,6 +1,13 @@
-import { useEffect } from 'react';
-import { ArrowLeft, Calendar, Clock, ExternalLink } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Calendar, Clock, ExternalLink, Sparkles, Loader } from 'lucide-react';
 import { useBlogPost } from '../hooks/usePortfolioData';
+import { supabase } from '../lib/supabase';
+
+interface ArticleResult {
+  url: string;
+  title: string;
+  snippet: string;
+}
 
 interface BlogDetailProps {
   postId: string;
@@ -9,10 +16,30 @@ interface BlogDetailProps {
 
 export const BlogDetail = ({ postId, onBack }: BlogDetailProps) => {
   const { data: post, isLoading } = useBlogPost(postId);
+  const [aiArticle, setAiArticle] = useState<ArticleResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  useEffect(() => {
+    if (!post?.content || aiArticle || aiLoading || aiError) return;
+    setAiLoading(true);
+    supabase.functions.invoke('find-related-article', {
+      body: { title: post.title, content: post.content },
+    })
+      .then(({ data, error }) => {
+        if (error || !data?.article) {
+          setAiError(true);
+        } else {
+          setAiArticle(data.article);
+        }
+      })
+      .catch(() => setAiError(true))
+      .finally(() => setAiLoading(false));
+  }, [post?.content]);
 
   if (isLoading) {
     return (
@@ -71,12 +98,12 @@ export const BlogDetail = ({ postId, onBack }: BlogDetailProps) => {
           ))}
         </div>
 
-        <div className="prose prose-lg max-w-none text-secondary leading-relaxed whitespace-pre-wrap">
+        <div className="text-secondary leading-relaxed whitespace-pre-wrap">
           {post.content}
         </div>
 
-        {post.link && (
-          <div className="mt-12 pt-8 border-t border-border">
+        <div className="mt-12 pt-8 border-t border-border space-y-4">
+          {post.link && (
             <a
               href={post.link}
               target="_blank"
@@ -86,8 +113,39 @@ export const BlogDetail = ({ postId, onBack }: BlogDetailProps) => {
               <ExternalLink size={16} />
               View original article
             </a>
-          </div>
-        )}
+          )}
+
+          {aiLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <Loader size={14} className="animate-spin" />
+              Finding related article...
+            </div>
+          )}
+
+          {aiArticle && (
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex items-center gap-2 text-xs font-semibold text-accent uppercase tracking-wider mb-2">
+                <Sparkles size={14} />
+                AI Recommended
+              </div>
+              <a
+                href={aiArticle.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block group"
+              >
+                <h4 className="font-bold text-primary group-hover:text-accent transition-colors mb-1">
+                  {aiArticle.title}
+                </h4>
+                <p className="text-sm text-muted">{aiArticle.snippet}</p>
+              </a>
+            </div>
+          )}
+
+          {aiError && !aiArticle && !post.link && (
+            <p className="text-sm text-muted">No related article found.</p>
+          )}
+        </div>
       </div>
     </div>
   );

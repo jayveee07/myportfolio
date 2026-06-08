@@ -67,6 +67,7 @@ export interface BlogPost {
   readTime: string;
   tags: string[];
   link: string;
+  imageUrl?: string;
 }
 
 export interface Stat {

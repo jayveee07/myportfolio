@@ -226,6 +226,7 @@ export interface Database {
           read_time: string
           tags: string[] | null
           link: string
+          image_url: string | null
           created_at: string | null
         }
         Insert: {
@@ -236,6 +237,7 @@ export interface Database {
           read_time: string
           tags?: string[]
           link: string
+          image_url?: string
         }
         Update: {
           title?: string
@@ -244,6 +246,7 @@ export interface Database {
           read_time?: string
           tags?: string[]
           link?: string
+          image_url?: string
         }
         Relationships: []
       }

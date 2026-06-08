@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { motion, useInView } from 'motion/react';
 import { Calendar, Clock, ArrowUpRight } from 'lucide-react';
 import { ScrollReveal } from './ScrollReveal';
@@ -8,6 +8,10 @@ export const BlogSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
   const { data: items, isLoading } = useBlogPosts();
+
+  const openLink = useCallback((url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
 
   return (
     <section ref={ref} id="blog" className="py-24 bg-surface-alt">
@@ -31,20 +35,28 @@ export const BlogSection = () => {
         ) : (
           <div className="grid md:grid-cols-3 gap-8">
             {items?.map((post, index) => (
-              <motion.a
+              <motion.div
                 key={post.id}
-                href={post.link}
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={() => openLink(post.link)}
                 initial={{ opacity: 0, y: 30 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: index * 0.15, duration: 0.6 }}
-                className="group bg-card rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 flex flex-col"
+                className="group bg-card rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 flex flex-col cursor-pointer"
               >
-                <div className="h-48 bg-gradient-to-br from-accent/20 to-violet-500/20 flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-2xl bg-card/80 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Clock className="w-8 h-8 text-accent" />
-                  </div>
+                <div className="h-48 overflow-hidden">
+                  {post.imageUrl ? (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-accent/20 to-violet-500/20 flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-2xl bg-card/80 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Clock className="w-8 h-8 text-accent" />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-8 flex flex-col flex-1">
                   <div className="flex items-center gap-4 text-sm text-muted mb-3">
@@ -74,7 +86,7 @@ export const BlogSection = () => {
                     Read More <ArrowUpRight size={16} />
                   </span>
                 </div>
-              </motion.a>
+              </motion.div>
             ))}
           </div>
         )}

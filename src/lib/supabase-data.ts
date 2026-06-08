@@ -342,6 +342,7 @@ export const getBlogPosts = async (): Promise<BlogPost[]> => {
     readTime: item.read_time,
     tags: item.tags || [],
     link: item.link,
+    imageUrl: item.image_url || undefined,
   }));
 };
 
@@ -355,6 +356,7 @@ export const createBlogPost = async (post: Omit<BlogPost, 'id'>) => {
       read_time: post.readTime,
       tags: post.tags,
       link: post.link,
+      image_url: post.imageUrl || null,
     });
   if (error) throw error;
 };
@@ -369,6 +371,7 @@ export const updateBlogPost = async (id: string, post: Partial<BlogPost>) => {
       read_time: post.readTime,
       tags: post.tags,
       link: post.link,
+      image_url: post.imageUrl || null,
     })
     .eq('id', id);
   if (error) throw error;
@@ -549,6 +552,30 @@ export const uploadProfessionalImage = async (file: File): Promise<string> => {
 
   const { data: { publicUrl } } = supabase.storage
     .from('professional-images')
+    .getPublicUrl(filePath);
+
+  return publicUrl;
+};
+
+export const uploadBlogImage = async (file: File): Promise<string> => {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const filePath = `blog/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('blog-images')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (uploadError) {
+    const { error: upsertError } = await supabase.storage
+      .from('blog-images')
+      .upload(filePath, file, { upsert: true });
+    if (upsertError) throw upsertError;
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('blog-images')
     .getPublicUrl(filePath);
 
   return publicUrl;

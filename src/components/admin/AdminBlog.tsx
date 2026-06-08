@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, ExternalLink, X, Loader, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, X, Loader, FileText, ImageUp } from 'lucide-react';
 import { useCreateBlogPost, useUpdateBlogPost, useDeleteBlogPost } from '../../hooks/usePortfolioData';
-import { getBlogPosts } from '../../lib/supabase-data';
+import { getBlogPosts, uploadBlogImage } from '../../lib/supabase-data';
 import type { BlogPost } from '../../types/portfolio';
 
-const emptyForm = { title: '', excerpt: '', date: '', readTime: '', link: '', tags: '' };
+const emptyForm = { title: '', excerpt: '', date: '', readTime: '', link: '', tags: '', imageUrl: '' };
 
 export const AdminBlog = () => {
   const { data: posts, isLoading } = useQuery({
@@ -22,6 +22,7 @@ export const AdminBlog = () => {
   const [editing, setEditing] = useState<BlogPost | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const openCreate = () => {
     setEditing(null);
@@ -38,9 +39,26 @@ export const AdminBlog = () => {
       readTime: post.readTime,
       link: post.link,
       tags: post.tags.join(', '),
+      imageUrl: post.imageUrl || '',
     });
     setShowModal(true);
   };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadBlogImage(file);
+      setForm(f => ({ ...f, imageUrl: url }));
+    } catch {
+      alert('Failed to upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = () => setForm(f => ({ ...f, imageUrl: '' }));
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +72,7 @@ export const AdminBlog = () => {
         readTime: form.readTime.trim() || '5 min read',
         tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
         link: form.link.trim(),
+        imageUrl: form.imageUrl || undefined,
       };
 
       if (editing) {
@@ -243,6 +262,34 @@ export const AdminBlog = () => {
                   placeholder="React, Firebase, Full-Stack"
                   className="w-full px-4 py-3 bg-surface-alt border border-border rounded-xl text-sm font-bold text-primary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all placeholder:text-muted"
                 />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Image</label>
+                {form.imageUrl ? (
+                  <div className="relative rounded-xl overflow-hidden border border-border">
+                    <img src={form.imageUrl} alt="Preview" className="w-full h-40 object-cover" />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      disabled={saving}
+                      className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-lg hover:bg-black/80 transition-all"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-3 w-full h-24 bg-surface-alt border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/50 transition-all">
+                    {uploading ? (
+                      <Loader size={18} className="animate-spin text-muted" />
+                    ) : (
+                      <div className="flex items-center gap-3 text-muted">
+                        <ImageUp size={20} />
+                        <span className="text-sm font-bold">Upload Image</span>
+                      </div>
+                    )}
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                  </label>
+                )}
               </div>
               <button
                 type="submit"

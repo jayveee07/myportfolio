@@ -68,6 +68,7 @@ export interface BlogPost {
   tags: string[];
   link: string;
   imageUrl?: string;
+  content?: string;
 }
 
 export interface Stat {

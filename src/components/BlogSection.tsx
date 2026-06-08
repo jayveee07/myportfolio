@@ -1,17 +1,17 @@
-import { useRef, useCallback } from 'react';
+import { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
 import { Calendar, Clock, ArrowUpRight } from 'lucide-react';
 import { ScrollReveal } from './ScrollReveal';
 import { useBlogPosts } from '../hooks/usePortfolioData';
 
-export const BlogSection = () => {
+interface BlogSectionProps {
+  onReadMore: (id: string) => void;
+}
+
+export const BlogSection = ({ onReadMore }: BlogSectionProps) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
   const { data: items, isLoading } = useBlogPosts();
-
-  const openLink = useCallback((url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }, []);
 
   return (
     <section ref={ref} id="blog" className="py-24 bg-surface-alt">
@@ -37,7 +37,7 @@ export const BlogSection = () => {
             {items?.map((post, index) => (
               <motion.div
                 key={post.id}
-                onClick={() => openLink(post.link)}
+                onClick={() => onReadMore(post.id)}
                 initial={{ opacity: 0, y: 30 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: index * 0.15, duration: 0.6 }}

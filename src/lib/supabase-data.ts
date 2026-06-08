@@ -343,7 +343,29 @@ export const getBlogPosts = async (): Promise<BlogPost[]> => {
     tags: item.tags || [],
     link: item.link,
     imageUrl: item.image_url || undefined,
+    content: item.content || undefined,
   }));
+};
+
+export const getBlogPostById = async (id: string): Promise<BlogPost | null> => {
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) return null;
+  if (!data) return null;
+  return {
+    id: data.id,
+    title: data.title,
+    excerpt: data.excerpt,
+    date: data.date,
+    readTime: data.read_time,
+    tags: data.tags || [],
+    link: data.link,
+    imageUrl: data.image_url || undefined,
+    content: data.content || undefined,
+  };
 };
 
 export const createBlogPost = async (post: Omit<BlogPost, 'id'>) => {
@@ -357,6 +379,7 @@ export const createBlogPost = async (post: Omit<BlogPost, 'id'>) => {
       tags: post.tags,
       link: post.link,
       image_url: post.imageUrl || null,
+      content: post.content || null,
     });
   if (error) throw error;
 };
@@ -372,6 +395,7 @@ export const updateBlogPost = async (id: string, post: Partial<BlogPost>) => {
       tags: post.tags,
       link: post.link,
       image_url: post.imageUrl || null,
+      content: post.content || null,
     })
     .eq('id', id);
   if (error) throw error;

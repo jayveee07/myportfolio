@@ -227,6 +227,7 @@ export interface Database {
           tags: string[] | null
           link: string
           image_url: string | null
+          content: string | null
           created_at: string | null
         }
         Insert: {
@@ -238,6 +239,7 @@ export interface Database {
           tags?: string[]
           link: string
           image_url?: string
+          content?: string
         }
         Update: {
           title?: string
@@ -247,6 +249,7 @@ export interface Database {
           tags?: string[]
           link?: string
           image_url?: string
+          content?: string
         }
         Relationships: []
       }

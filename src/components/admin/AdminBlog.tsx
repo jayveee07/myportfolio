@@ -5,7 +5,7 @@ import { useCreateBlogPost, useUpdateBlogPost, useDeleteBlogPost } from '../../h
 import { getBlogPosts, uploadBlogImage } from '../../lib/supabase-data';
 import type { BlogPost } from '../../types/portfolio';
 
-const emptyForm = { title: '', excerpt: '', date: '', readTime: '', link: '', tags: '', imageUrl: '' };
+const emptyForm = { title: '', excerpt: '', date: '', readTime: '', link: '', tags: '', imageUrl: '', content: '' };
 
 export const AdminBlog = () => {
   const { data: posts, isLoading } = useQuery({
@@ -40,6 +40,7 @@ export const AdminBlog = () => {
       link: post.link,
       tags: post.tags.join(', '),
       imageUrl: post.imageUrl || '',
+      content: post.content || '',
     });
     setShowModal(true);
   };
@@ -62,7 +63,7 @@ export const AdminBlog = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.excerpt.trim() || !form.link.trim()) return;
+    if (!form.title.trim() || !form.excerpt.trim()) return;
     setSaving(true);
     try {
       const payload = {
@@ -73,6 +74,7 @@ export const AdminBlog = () => {
         tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
         link: form.link.trim(),
         imageUrl: form.imageUrl || undefined,
+        content: form.content.trim() || undefined,
       };
 
       if (editing) {
@@ -243,13 +245,22 @@ export const AdminBlog = () => {
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Link *</label>
+                <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Content</label>
+                <textarea
+                  rows={8}
+                  value={form.content}
+                  onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+                  placeholder="Write your full blog post content here..."
+                  className="w-full px-4 py-3 bg-surface-alt border border-border rounded-xl text-sm font-bold text-primary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all placeholder:text-muted resize-y"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Link</label>
                 <input
                   type="url"
-                  required
                   value={form.link}
                   onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
-                  placeholder="https://example.com/my-post"
+                  placeholder="https://example.com/my-post (optional)"
                   className="w-full px-4 py-3 bg-surface-alt border border-border rounded-xl text-sm font-bold text-primary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all placeholder:text-muted"
                 />
               </div>
@@ -293,7 +304,7 @@ export const AdminBlog = () => {
               </div>
               <button
                 type="submit"
-                disabled={saving || !form.title.trim() || !form.excerpt.trim() || !form.link.trim()}
+                disabled={saving || !form.title.trim() || !form.excerpt.trim()}
                 className="w-full py-4 bg-accent text-white rounded-2xl font-bold hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
               >
                 {saving ? (

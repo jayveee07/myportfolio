@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getExperience, getSkills, getEducation, getProjects,
   getTestimonials, getAllTestimonials, approveTestimonial, deleteTestimonial,
-  getBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
+  getBlogPosts, getBlogPostById, createBlogPost, updateBlogPost, deleteBlogPost,
   getProfile,
 } from '../lib/supabase-data';
 import type { Experience, SkillGroup, Education, Project, Testimonial, BlogPost, Profile } from '../types/portfolio';
@@ -98,6 +98,15 @@ export const useBlogPosts = () =>
     queryFn: getBlogPosts,
     staleTime: 10 * 1000,
     refetchInterval: 10 * 1000,
+    retry: 2,
+  });
+
+export const useBlogPost = (id: string | undefined) =>
+  useQuery<BlogPost | null>({
+    queryKey: ['blog-post', id],
+    queryFn: () => getBlogPostById(id!),
+    enabled: !!id,
+    staleTime: 10 * 1000,
     retry: 2,
   });
 

@@ -20,6 +20,7 @@ import { ModernExperience } from './components/ModernExperience';
 import { ModernProjects } from './components/ModernProjects';
 import { Testimonials } from './components/Testimonials';
 import { BlogSection } from './components/BlogSection';
+import { BlogDetail } from './components/BlogDetail';
 import { ScrollReveal } from './components/ScrollReveal';
 import { ModernFooter } from './components/ModernFooter';
 import { ADMIN_EMAIL } from './lib/supabase';
@@ -48,6 +49,8 @@ export default function App() {
   const [resumeUrl, setResumeUrl] = useState(DEFAULT_PROFILE.resumeUrl);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
+  const [isBlogDetailView, setIsBlogDetailView] = useState(false);
+  const [blogDetailId, setBlogDetailId] = useState<string | null>(null);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -85,11 +88,33 @@ export default function App() {
   });
 
   useEffect(() => {
-    const checkPath = () => setIsAdminView(window.location.pathname === '/admin');
+    const checkPath = () => {
+      setIsAdminView(window.location.pathname === '/admin');
+      const blogMatch = window.location.pathname.match(/^\/blog\/(.+)/);
+      if (blogMatch) {
+        setBlogDetailId(blogMatch[1]);
+        setIsBlogDetailView(true);
+      } else {
+        setIsBlogDetailView(false);
+        setBlogDetailId(null);
+      }
+    };
     checkPath();
     window.addEventListener('popstate', checkPath);
     return () => window.removeEventListener('popstate', checkPath);
   }, []);
+
+  const handleReadMore = (id: string) => {
+    window.history.pushState({}, '', `/blog/${id}`);
+    setBlogDetailId(id);
+    setIsBlogDetailView(true);
+  };
+
+  const handleBackToBlog = () => {
+    window.history.pushState({}, '', '/');
+    setIsBlogDetailView(false);
+    setBlogDetailId(null);
+  };
 
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
@@ -153,6 +178,10 @@ export default function App() {
   };
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (isBlogDetailView && blogDetailId) {
+    return <BlogDetail postId={blogDetailId} onBack={handleBackToBlog} />;
+  }
 
   if (isAdminView) {
     return (
@@ -250,7 +279,7 @@ export default function App() {
       {isSectionVisible('experience') && <ScrollReveal delay={0.2}><ModernExperience experience={experience} education={education} onContact={handleOpenContact} /></ScrollReveal>}
       {isSectionVisible('projects') && <ScrollReveal delay={0.3}><ModernProjects projects={projects} onContact={handleOpenContact} /></ScrollReveal>}
       {isSectionVisible('testimonials') && <ScrollReveal delay={0.1}><Testimonials /></ScrollReveal>}
-      {isSectionVisible('blog') && <ScrollReveal delay={0.2}><BlogSection /></ScrollReveal>}
+      {isSectionVisible('blog') && <ScrollReveal delay={0.2}><BlogSection onReadMore={handleReadMore} /></ScrollReveal>}
 
       {isSectionVisible('footer') && <ModernFooter profile={profile} onChat={handleContact} onEmail={handleOpenContact} />}
 

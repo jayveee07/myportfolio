@@ -58,10 +58,10 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                 initial={{ opacity: 0, x: index % 2 === 0 ? -30 : 30 }}
                 animate={isInView ? { opacity: 1, x: 0 } : {}}
                 transition={{ delay: index * 0.15, duration: 0.6 }}
-                className={`relative flex items-center gap-8 ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'}`}
+                className={`relative flex items-center gap-8 md:flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'}`}
               >
                 {/* Content Card */}
-                <div className={`flex-1 ${index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'}`}>
+                <div className={`flex-1 md:w-full md:max-w-2xl ${index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'}`}>
                   <div className="bg-card p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 group">
                     {/* Date Badge */}
                     <div className={`inline-flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent rounded-full text-sm font-semibold mb-4 ${index % 2 === 0 ? 'lg:ml-auto' : ''}`}>
@@ -95,7 +95,7 @@ export const ModernExperience = ({ experience, education, onContact }: ModernExp
                 </div>
 
                 {/* Spacer */}
-                <div className="flex-1" />
+                <div className="flex-1 md:hidden lg:block" />
               </motion.div>
             ))}
           </div>

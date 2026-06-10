@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
-import { getExperience, getSkills, getEducation, getProjects, createExperience, updateExperience, deleteExperience, createSkill, updateSkill, deleteSkill, createEducation, updateEducation, deleteEducation, createProject, updateProject, deleteProject } from '../../lib/supabase-data';
+import { Plus, Pencil, Trash2, X, Upload, Loader2, ImageUp } from 'lucide-react';
+import { getExperience, getSkills, getEducation, getProjects, createExperience, updateExperience, deleteExperience, createSkill, updateSkill, deleteSkill, createEducation, updateEducation, deleteEducation, createProject, updateProject, deleteProject, uploadProjectImage } from '../../lib/supabase-data';
 import type { Experience, SkillGroup, Education, Project } from '../../types/portfolio';
 
 type Tab = 'experiences' | 'skills' | 'education' | 'projects';
@@ -18,7 +18,7 @@ const emptyForm = (tab: Tab): Record<string, unknown> => {
     case 'experiences': return { company: '', role: '', period: '', description: [''], order: 0 };
     case 'skills': return { category: '', items: [''], order: 0 };
     case 'education': return { school: '', degree: '', period: '', description: [''], order: 0 };
-    case 'projects': return { title: '', description: '', tech_stack: [''], featured: false, link: '', github: '' };
+    case 'projects': return { title: '', description: '', tech_stack: [''], featured: false, link: '', github: '', image_url: '' };
   }
 };
 
@@ -31,6 +31,7 @@ export const ContentManager = () => {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>({ open: false, type: 'create', tab: 'experiences', item: {} });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -51,6 +52,20 @@ export const ContentManager = () => {
 
   const openCreate = (t: Tab) => setModal({ open: true, type: 'create', tab: t, item: emptyForm(t) });
   const openEdit = (t: Tab, item: Record<string, unknown>) => setModal({ open: true, type: 'edit', tab: t, item: { ...item } });
+
+  const handleProjectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const url = await uploadProjectImage(file);
+      setModal({ ...modal, item: { ...modal.item, image_url: url } });
+    } catch {
+      alert('Failed to upload image.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     const { tab: t, type, item } = modal;
@@ -157,11 +172,12 @@ export const ContentManager = () => {
       case 'projects':
         return (
           <table className="w-full">
-            <thead><tr className="text-left text-[10px] font-black text-secondary uppercase tracking-widest border-b border-border"><th className="pb-3 pl-4">Title</th><th className="pb-3">Featured</th><th className="pb-3">Tech Stack</th><th className="pb-3 pr-4 w-24">Actions</th></tr></thead>
+            <thead><tr className="text-left text-[10px] font-black text-secondary uppercase tracking-widest border-b border-border"><th className="pb-3 pl-4">Title</th><th className="pb-3">Image</th><th className="pb-3">Featured</th><th className="pb-3">Tech Stack</th><th className="pb-3 pr-4 w-24">Actions</th></tr></thead>
             <tbody>
               {(projects as Project[]).map(pr => (
                 <tr key={pr.id} className="border-b border-border hover:bg-surface-alt/50 transition-colors">
                   <td className="py-4 pl-4 font-bold text-primary">{pr.title}</td>
+                  <td className="py-4">{pr.imageUrl ? <img src={pr.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <span className="text-muted text-sm">—</span>}</td>
                   <td className="py-4">{pr.featured ? <span className="px-2 py-1 bg-accent/10 text-accent text-[10px] font-black rounded-lg">Featured</span> : <span className="text-muted text-sm">—</span>}</td>
                   <td className="py-4 text-sm text-secondary">{(pr.techStack || []).join(', ')}</td>
                   <td className="py-4 pr-4">
@@ -218,6 +234,40 @@ export const ContentManager = () => {
               <input type="checkbox" checked={(item as any).featured || false} onChange={e => set('featured', e.target.checked)} className="w-4 h-4 rounded border-border text-accent focus:ring-accent" />
               <span className="text-sm font-bold text-primary">Featured Project</span>
             </label>
+            <div>
+              <label className="block text-[10px] font-black text-secondary uppercase tracking-widest mb-2">Image</label>
+              <div className="flex gap-2 mb-2">
+                <label className="flex-1 flex items-center justify-center gap-2 h-20 bg-surface-alt border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/50 transition-all">
+                  {imageUploading ? (
+                    <Loader2 size={18} className="animate-spin text-muted" />
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted">
+                      <ImageUp size={18} />
+                      <span className="text-xs font-bold">Upload</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={handleProjectImageUpload} className="hidden" disabled={imageUploading} />
+                </label>
+                <input
+                  value={(item as any).image_url || ''}
+                  onChange={v => set('image_url', v)}
+                  placeholder="Or paste URL..."
+                  className="flex-1 bg-surface-alt border-2 border-transparent rounded-xl px-4 py-3 text-sm focus:bg-surface focus:border-accent/10 focus:outline-none font-bold transition-all"
+                />
+              </div>
+              {(item as any).image_url && (
+                <div className="relative rounded-xl overflow-hidden border border-border">
+                  <img src={(item as any).image_url} alt="" className="w-full h-32 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => set('image_url', '')}
+                    className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded-lg hover:bg-black/80"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
             <Input label="Link URL" value={(item as any).link || ''} onChange={v => set('link', v)} />
             <Input label="GitHub URL" value={(item as any).github || ''} onChange={v => set('github', v)} />
           </div>

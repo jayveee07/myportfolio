@@ -72,9 +72,18 @@ export const ModernProjects = ({ projects, onContact }: ModernProjectsProps) => 
           {filtered.map((project, index) => (
             <TiltCard key={index}>
               <div className="group relative bg-card rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-500 card-hover h-full">
-                {/* Image Placeholder with Gradient */}
-                <div className="relative h-64 bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${index === 0 ? 'from-blue-400 to-violet-500' : 'from-emerald-400 to-cyan-500'} opacity-75 transition-opacity duration-500`} />
+                {/* Project Image */}
+                <div className="relative h-64 overflow-hidden">
+                  {project.imageUrl ? (
+                    <img
+                      src={project.imageUrl}
+                      alt={project.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-br', index === 0 ? 'from-blue-400 to-violet-500' : 'from-emerald-400 to-cyan-500'); }}
+                    />
+                  ) : (
+                    <div className={`w-full h-full bg-gradient-to-br ${index === 0 ? 'from-blue-400 to-violet-500' : 'from-emerald-400 to-cyan-500'} opacity-75`} />
+                  )}
                   
                   {/* Floating Icons */}
                   <div className="absolute top-4 right-4 flex gap-2">

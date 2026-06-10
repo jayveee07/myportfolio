@@ -62,6 +62,7 @@ export const getProjects = async (): Promise<Project[]> => {
     featured: item.featured || false,
     link: item.link || undefined,
     github: item.github || undefined,
+    imageUrl: item.image_url || undefined,
   }));
 };
 
@@ -213,6 +214,7 @@ export const createProject = async (proj: Omit<Project, 'id'>) => {
     featured: proj.featured,
     link: proj.link,
     github: proj.github,
+    image_url: proj.imageUrl || null,
   });
   if (error) throw error;
 };
@@ -225,6 +227,7 @@ export const updateProject = async (id: string, proj: Partial<Project>) => {
     featured: proj.featured,
     link: proj.link,
     github: proj.github,
+    image_url: proj.imageUrl !== undefined ? proj.imageUrl || null : undefined,
   }).eq('id', id);
   if (error) throw error;
 };
@@ -578,6 +581,27 @@ export const uploadProfessionalImage = async (file: File): Promise<string> => {
     .from('professional-images')
     .getPublicUrl(filePath);
 
+  return publicUrl;
+};
+
+export const uploadProjectImage = async (file: File): Promise<string> => {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const filePath = `projects/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('blog-images')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+  if (uploadError) {
+    const { error: upsertError } = await supabase.storage
+      .from('blog-images')
+      .upload(filePath, file, { upsert: true });
+    if (upsertError) throw upsertError;
+  }
+  const { data: { publicUrl } } = supabase.storage
+    .from('blog-images')
+    .getPublicUrl(filePath);
   return publicUrl;
 };
 

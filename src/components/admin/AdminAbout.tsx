@@ -38,6 +38,7 @@ export const AdminAbout = () => {
 
   const [titleInput, setTitleInput] = useState('');
   const [langInput, setLangInput] = useState('');
+  const [urlInput, setUrlInput] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
   const imagesInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef(form);
@@ -137,6 +138,16 @@ export const AdminAbout = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }, [saveForm]);
+
+  const handleAddUrl = useCallback(async () => {
+    const val = urlInput.trim();
+    if (!val) return;
+    const current = formRef.current;
+    const next = { ...current, professionalImages: [...(current.professionalImages || []), val] };
+    setForm(next);
+    setUrlInput('');
+    await saveForm(next);
+  }, [urlInput, saveForm]);
 
   const handlePhotoUpload = useCallback(async (file: File) => {
     setUploading(true);
@@ -333,7 +344,7 @@ export const AdminAbout = () => {
       {tab === 'photos' && (
         <div className="grid gap-8">
           <SectionCard title="Hero Profile Photo">
-            <p className="text-xs text-secondary mb-3">Shown in the hero badge. Upload a square photo for best results.</p>
+            <p className="text-xs text-secondary mb-3">Shown in the hero badge. Upload a square photo or paste a URL for best results.</p>
             <div className="flex items-center gap-5">
               <div className="w-20 h-20 rounded-full overflow-hidden bg-surface-alt shrink-0 ring-2 ring-accent/20 flex items-center justify-center">
                 {form.photoUrl ? (
@@ -369,6 +380,17 @@ export const AdminAbout = () => {
                     Remove
                   </button>
                 )}
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Or paste an image URL</label>
+              <div className="flex gap-2">
+                <input
+                  value={form.photoUrl || ''}
+                  onChange={e => set('photoUrl', e.target.value)}
+                  placeholder="https://example.com/photo.jpg"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-border focus:outline-none focus:border-accent text-sm"
+                />
               </div>
             </div>
           </SectionCard>
@@ -429,6 +451,25 @@ export const AdminAbout = () => {
                 No images yet. Click the dashed area above to upload.
               </p>
             )}
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Or add by URL</label>
+              <div className="flex gap-2">
+                <input
+                  value={urlInput}
+                  onChange={e => setUrlInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrl(); } }}
+                  placeholder="https://example.com/image.jpg"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-border focus:outline-none focus:border-accent text-sm"
+                />
+                <button
+                  onClick={handleAddUrl}
+                  className="px-4 py-2.5 bg-surface-alt rounded-xl font-semibold text-sm hover:bg-surface-alt/80 transition-all"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
           </SectionCard>
         </div>
       )}

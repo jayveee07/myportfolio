@@ -22,6 +22,7 @@ export interface Project {
   featured?: boolean;
   link?: string;
   github?: string;
+  imageUrl?: string;
 }
 
 export interface SkillGroup {

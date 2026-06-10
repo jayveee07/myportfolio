@@ -291,7 +291,33 @@ export const AdminBlog = () => {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 block">Image</label>
-                {form.imageUrl ? (
+                <div className="flex gap-2 mb-3">
+                  <label className="flex-1 flex items-center justify-center gap-3 h-24 bg-surface-alt border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/50 transition-all">
+                    {uploading ? (
+                      <Loader size={18} className="animate-spin text-muted" />
+                    ) : (
+                      <div className="flex items-center gap-3 text-muted">
+                        <ImageUp size={20} />
+                        <span className="text-sm font-bold">Upload</span>
+                      </div>
+                    )}
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                  </label>
+                  <label className="flex-1 flex items-center justify-center gap-3 h-24 bg-surface-alt border-2 border-border rounded-xl cursor-text hover:border-accent/50 transition-all">
+                    <div className="flex flex-col items-center gap-1 text-muted px-3 w-full">
+                      <span className="text-sm font-bold">Paste URL</span>
+                      <input
+                        type="url"
+                        value={form.imageUrl || ''}
+                        onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))}
+                        placeholder="https://example.com/image.jpg"
+                        className="w-full bg-transparent text-xs text-center focus:outline-none placeholder:text-muted/50"
+                        onClick={e => e.stopPropagation()}
+                      />
+                    </div>
+                  </label>
+                </div>
+                {form.imageUrl && (
                   <div className="relative rounded-xl overflow-hidden border border-border">
                     <img src={form.imageUrl} alt="Preview" className="w-full h-40 object-cover" />
                     <button
@@ -303,18 +329,6 @@ export const AdminBlog = () => {
                       <X size={14} />
                     </button>
                   </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-3 w-full h-24 bg-surface-alt border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/50 transition-all">
-                    {uploading ? (
-                      <Loader size={18} className="animate-spin text-muted" />
-                    ) : (
-                      <div className="flex items-center gap-3 text-muted">
-                        <ImageUp size={20} />
-                        <span className="text-sm font-bold">Upload Image</span>
-                      </div>
-                    )}
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
-                  </label>
                 )}
               </div>
               <button

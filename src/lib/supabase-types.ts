@@ -85,6 +85,7 @@ export interface Database {
           featured: boolean | null
           link: string | null
           github: string | null
+          image_url: string | null
           created_at: string | null
         }
         Insert: {
@@ -95,6 +96,7 @@ export interface Database {
           featured?: boolean
           link?: string
           github?: string
+          image_url?: string | null
         }
         Update: {
           title?: string
@@ -103,6 +105,7 @@ export interface Database {
           featured?: boolean
           link?: string
           github?: string
+          image_url?: string | null
         }
         Relationships: []
       }

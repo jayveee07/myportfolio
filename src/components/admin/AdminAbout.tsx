@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Eye, EyeOff, X, Plus, Loader2, Trash2, GripVertical, ImageIcon, Upload } from 'lucide-react';
-import { getProfile, updateProfile, uploadProfessionalImage } from '../../lib/supabase-data';
+import { getProfile, updateProfile, uploadProfessionalImage, deleteStorageFileFromUrl } from '../../lib/supabase-data';
 import { subscribeToAdminSettings, updateAdminSettings } from '../../lib/supabase-messaging';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Profile } from '../../types/portfolio';
@@ -99,21 +99,29 @@ export const AdminAbout = () => {
 
   const handleDeleteImage = useCallback(async (index: number) => {
     const current = formRef.current;
+    const removedUrl = current.professionalImages[index];
     const next = {
       ...current,
       professionalImages: current.professionalImages.filter((_, i) => i !== index),
     };
     setForm(next);
-    await saveForm(next);
+    await Promise.all([
+      saveForm(next),
+      ...(removedUrl ? [deleteStorageFileFromUrl(removedUrl).catch(() => {})] : []),
+    ]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }, [saveForm]);
 
   const handleRemovePhoto = useCallback(async () => {
     const current = formRef.current;
+    const oldUrl = current.photoUrl;
     const next = { ...current, photoUrl: '' };
     setForm(next);
-    await saveForm(next);
+    await Promise.all([
+      saveForm(next),
+      ...(oldUrl ? [deleteStorageFileFromUrl(oldUrl).catch(() => {})] : []),
+    ]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }, [saveForm]);

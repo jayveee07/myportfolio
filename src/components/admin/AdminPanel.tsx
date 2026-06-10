@@ -12,7 +12,7 @@ import { Sun, Moon, Bot, Volume2, VolumeX, FileText, Loader2 } from 'lucide-reac
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/SupabaseAuthContext';
 import { subscribeToAdminSettings, updateAdminSettings, type AdminSettings } from '../../lib/supabase-messaging';
-import { uploadResume } from '../../lib/supabase-data';
+import { uploadResume, deleteStorageFileFromUrl } from '../../lib/supabase-data';
 
 export const AdminPanel = () => {
   const { user } = useAuth();
@@ -75,8 +75,10 @@ const SettingsPage = () => {
     }
     setUploading(true);
     try {
+      const oldUrl = adminSettings.resumeUrl;
       const url = await uploadResume(file);
       await updateAdminSettings({ resumeUrl: url });
+      if (oldUrl) deleteStorageFileFromUrl(oldUrl).catch(() => {});
       alert('Resume updated successfully!');
     } catch {
       alert('Failed to upload resume.');

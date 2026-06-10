@@ -605,6 +605,47 @@ export const uploadBlogImage = async (file: File): Promise<string> => {
   return publicUrl;
 };
 
+export const extractStoragePathFromUrl = (url: string): { bucket: string; path: string } | null => {
+  try {
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    const storageIndex = pathParts.indexOf('object');
+    if (storageIndex === -1 || storageIndex + 2 >= pathParts.length) return null;
+    const bucket = pathParts[storageIndex + 1];
+    const path = pathParts.slice(storageIndex + 2).join('/');
+    if (!bucket || !path) return null;
+    return { bucket, path: decodeURIComponent(path) };
+  } catch {
+    return null;
+  }
+};
+
+export const deleteStorageFile = async (bucket: string, path: string) => {
+  const { error } = await supabase.storage
+    .from(bucket)
+    .remove([path]);
+  if (error) throw error;
+};
+
+export const deleteStorageFileFromUrl = async (url: string) => {
+  if (!url) return;
+  const info = extractStoragePathFromUrl(url);
+  if (!info) return;
+  await deleteStorageFile(info.bucket, info.path);
+};
+
+export const deleteBlogPostWithImage = async (id: string) => {
+  const post = await getBlogPostById(id);
+  if (post?.imageUrl) {
+    await deleteStorageFileFromUrl(post.imageUrl).catch(() => {});
+  }
+  const { error } = await supabase
+    .from('blog_posts')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+};
+
 const ADMIN_EMAIL = 'jvpaisan@gmail.com';
 
 const DEFAULT_PROJECTS = [

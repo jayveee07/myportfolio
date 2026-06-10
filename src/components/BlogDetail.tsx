@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Calendar, Clock, ExternalLink, Sparkles, Loader } from 'lucide-react';
 import { useBlogPost } from '../hooks/usePortfolioData';
 import { supabase } from '../lib/supabase';
@@ -40,6 +40,83 @@ export const BlogDetail = ({ postId, onBack }: BlogDetailProps) => {
       .catch(() => setAiError(true))
       .finally(() => setAiLoading(false));
   }, [post?.content]);
+
+const MarkdownRenderer = ({ content }: { content: string }) => {
+  const html = useMemo(() => {
+    let result = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const lines = result.split('\n');
+    const processed: string[] = [];
+    let inCodeBlock = false;
+    let codeBuffer: string[] = [];
+    let codeLang = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.startsWith('```')) {
+        if (inCodeBlock) {
+          processed.push(`<pre class="bg-surface-alt rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code class="language-${codeLang}">${codeBuffer.join('\n')}</code></pre>`);
+          codeBuffer = [];
+          codeLang = '';
+          inCodeBlock = false;
+        } else {
+          inCodeBlock = true;
+          codeLang = line.slice(3).trim();
+        }
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeBuffer.push(line);
+        continue;
+      }
+
+      if (line.trim() === '') {
+        processed.push('');
+        continue;
+      }
+
+      if (/^#{1,6}\s/.test(line)) {
+        const level = line.match(/^#{1,6}/)![0].length;
+        const text = line.slice(level).trim();
+        processed.push(`<h${level} class="text-${level === 1 ? '3xl' : level === 2 ? '2xl' : level === 3 ? 'xl' : 'lg'} font-bold text-primary mt-6 mb-3">${inlineFormat(text)}</h${level}>`);
+        continue;
+      }
+
+      if (/^\d+\.\s/.test(line)) {
+        processed.push(`<li class="ml-6 list-decimal text-secondary mb-1">${inlineFormat(line.replace(/^\d+\.\s/, ''))}</li>`);
+        continue;
+      }
+
+      if (/^[-*]\s/.test(line)) {
+        processed.push(`<li class="ml-6 list-disc text-secondary mb-1">${inlineFormat(line.replace(/^[-*]\s/, ''))}</li>`);
+        continue;
+      }
+
+      processed.push(`<p class="mb-4 text-secondary leading-relaxed">${inlineFormat(line)}</p>`);
+    }
+
+    if (inCodeBlock && codeBuffer.length > 0) {
+      processed.push(`<pre class="bg-surface-alt rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code class="language-${codeLang}">${codeBuffer.join('\n')}</code></pre>`);
+    }
+
+    return processed.join('\n');
+  }, [content]);
+
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const inlineFormat = (text: string): string => {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-primary">$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code class="bg-surface-alt px-1.5 py-0.5 rounded text-sm font-mono text-accent">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline font-semibold">$1</a>');
+};
 
   if (isLoading) {
     return (
@@ -98,8 +175,8 @@ export const BlogDetail = ({ postId, onBack }: BlogDetailProps) => {
           ))}
         </div>
 
-        <div className="text-secondary leading-relaxed whitespace-pre-wrap">
-          {post.content}
+        <div className="text-secondary leading-relaxed">
+          <MarkdownRenderer content={post.content || ''} />
         </div>
 
         <div className="mt-12 pt-8 border-t border-border space-y-4">

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ExternalLink, X, Loader, FileText, ImageUp } from 'lucide-react';
 import { useCreateBlogPost, useUpdateBlogPost, useDeleteBlogPost } from '../../hooks/usePortfolioData';
-import { getBlogPosts, uploadBlogImage } from '../../lib/supabase-data';
+import { getBlogPosts, uploadBlogImage, deleteStorageFileFromUrl, getBlogPostById } from '../../lib/supabase-data';
 import type { BlogPost } from '../../types/portfolio';
 
 const emptyForm = { title: '', excerpt: '', date: '', readTime: '', link: '', tags: '', imageUrl: '', content: '' };
@@ -50,8 +50,10 @@ export const AdminBlog = () => {
     if (!file) return;
     setUploading(true);
     try {
+      const oldUrl = form.imageUrl;
       const url = await uploadBlogImage(file);
       setForm(f => ({ ...f, imageUrl: url }));
+      if (oldUrl) deleteStorageFileFromUrl(oldUrl).catch(() => {});
     } catch {
       alert('Failed to upload image.');
     } finally {
@@ -59,7 +61,11 @@ export const AdminBlog = () => {
     }
   };
 
-  const removeImage = () => setForm(f => ({ ...f, imageUrl: '' }));
+  const removeImage = () => {
+    const oldUrl = form.imageUrl;
+    setForm(f => ({ ...f, imageUrl: '' }));
+    if (oldUrl) deleteStorageFileFromUrl(oldUrl).catch(() => {});
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,10 +166,19 @@ export const AdminBlog = () => {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Delete this blog post?')) {
+                    onClick={async () => {
+                      if (!confirm('Delete this blog post?')) return;
+                      try {
+                        const fullPost = await getBlogPostById(post.id);
+                        if (fullPost?.imageUrl) {
+                          await deleteStorageFileFromUrl(fullPost.imageUrl).catch(() => {});
+                        }
                         deleteMutation.mutate(post.id, {
                           onError: () => alert('Failed to delete blog post. Check RLS policies or console for details.'),
+                        });
+                      } catch {
+                        deleteMutation.mutate(post.id, {
+                          onError: () => alert('Failed to delete blog post.'),
                         });
                       }
                     }}

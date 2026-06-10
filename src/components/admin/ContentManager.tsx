@@ -83,7 +83,17 @@ export const ContentManager = () => {
         if (type === 'create') await createEducation(ed as Omit<Education, 'id'>);
         else await updateEducation(ed.id!, ed);
       } else if (t === 'projects') {
-        const pr = item as unknown as Project;
+        const raw = item as Record<string, unknown>;
+        const pr: Project = {
+          id: raw.id as string,
+          title: raw.title as string,
+          description: raw.description as string,
+          techStack: raw.tech_stack as string[],
+          featured: raw.featured as boolean,
+          link: raw.link as string,
+          github: raw.github as string,
+          imageUrl: raw.image_url as string || undefined,
+        };
         if (type === 'create') await createProject(pr as Omit<Project, 'id'>);
         else await updateProject(pr.id!, pr);
       }

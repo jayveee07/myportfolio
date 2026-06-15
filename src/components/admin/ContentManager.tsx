@@ -31,8 +31,11 @@ export const ContentManager = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>({ open: false, type: 'create', tab: 'experiences', item: {} });
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [techInput, setTechInput] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const tags = ((modal.item.tech_stack as string) || '').split(',').map(t => t.trim()).filter(Boolean);
 
   const load = async () => {
     setLoading(true);
@@ -51,8 +54,9 @@ export const ContentManager = () => {
   const dataMap: Record<Tab, unknown[]> = { experiences, skills, education, projects };
   const currentData = dataMap[tab] as Record<string, unknown>[];
 
-  const openCreate = (t: Tab) => setModal({ open: true, type: 'create', tab: t, item: emptyForm(t) });
+  const openCreate = (t: Tab) => { setTechInput(''); setModal({ open: true, type: 'create', tab: t, item: emptyForm(t) }); };
   const openEdit = (t: Tab, item: Record<string, unknown>) => {
+    setTechInput('');
     const clone = { ...item };
     if (t === 'projects' && Array.isArray(clone.tech_stack)) {
       clone.tech_stack = clone.tech_stack.join(', ');
@@ -264,7 +268,63 @@ export const ContentManager = () => {
           <div className="space-y-4">
             <Input label="Title" value={(item as any).title || ''} onChange={v => set('title', v)} />
             <Textarea label="Description" value={(item as any).description || ''} onChange={v => set('description', v)} />
-            <Input label="Tech Stack" value={(item as any).tech_stack || ''} onChange={v => set('tech_stack', v)} placeholder="css, laravel, react" />
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-secondary uppercase tracking-widest">Tech Stack</label>
+              <div className="flex gap-2">
+                <input
+                  value={techInput}
+                  onChange={e => setTechInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      const val = sanitizeText(techInput.trim());
+                      if (val) {
+                        const current = ((item as any).tech_stack || '') as string;
+                        const next = current ? `${current}, ${val}` : val;
+                        set('tech_stack', next);
+                      }
+                      setTechInput('');
+                    }
+                  }}
+                  placeholder="Type and press Enter or comma to add..."
+                  className="flex-1 bg-surface-alt border-2 border-transparent rounded-xl px-4 py-3 text-sm focus:bg-surface focus:border-accent/10 focus:outline-none font-bold transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = sanitizeText(techInput.trim());
+                    if (val) {
+                      const current = ((item as any).tech_stack || '') as string;
+                      const next = current ? `${current}, ${val}` : val;
+                      set('tech_stack', next);
+                    }
+                    setTechInput('');
+                  }}
+                  className="px-4 py-2 bg-accent text-white rounded-xl text-xs font-bold hover:bg-accent/90 transition-all"
+                >
+                  Add
+                </button>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {tags.map((tag, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-tag text-secondary text-[10px] font-bold rounded-full">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = tags.filter((_, j) => j !== i).join(', ');
+                          set('tech_stack', next);
+                        }}
+                        className="hover:text-red-500 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={(item as any).featured || false} onChange={e => set('featured', e.target.checked)} className="w-4 h-4 rounded border-border text-accent focus:ring-accent" />
               <span className="text-sm font-bold text-primary">Featured Project</span>

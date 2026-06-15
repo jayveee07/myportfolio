@@ -317,7 +317,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
             className={`fixed ${isShifted ? 'bottom-24' : 'bottom-6'} right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[620px] bg-surface rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] z-[300] border border-border/50 flex flex-col overflow-hidden transition-all duration-300`}
           >
           {/* Header */}
-          <div className="bg-primary px-6 py-8 text-white flex items-center justify-between relative overflow-hidden shrink-0">
+          <div className="bg-btn px-6 py-8 text-white flex items-center justify-between relative overflow-hidden shrink-0">
             {/* Subtle background glow */}
             <div className="absolute -top-12 -right-12 w-40 h-40 bg-accent/25 blur-3xl rounded-full" />
             

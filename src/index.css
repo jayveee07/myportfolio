@@ -139,7 +139,7 @@
 }
 
 @utility ink-button {
-  @apply relative bg-primary text-white px-10 py-4 rounded-2xl font-bold tracking-tight transition-all hover:bg-slate-900 active:scale-[0.98] flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-white/5;
+  @apply relative bg-btn text-white px-10 py-4 rounded-2xl font-bold tracking-tight transition-all hover:bg-btn/90 active:scale-[0.98] flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-white/5;
   
   &:hover {
     @apply shadow-[0_15px_40px_rgba(14,165,233,0.25)];

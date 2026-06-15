@@ -127,7 +127,7 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
             {/* Sidebar info */}
             <div className="w-full md:w-72 bg-surface-alt p-10 border-b md:border-b-0 md:border-r border-line flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white mb-8 shadow-lg shadow-primary/20">
+                <div className="w-12 h-12 bg-btn rounded-2xl flex items-center justify-center text-white mb-8 shadow-lg shadow-primary/20">
                   <Mail size={20} />
                 </div>
                 <h3 className="text-2xl font-black text-primary uppercase tracking-tighter mb-4">Secure<br />Dispatch</h3>

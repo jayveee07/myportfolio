@@ -202,7 +202,13 @@ export const ContentManager = () => {
                   <td className="py-4 pl-4 font-bold text-primary">{pr.title}</td>
                   <td className="py-4">{pr.imageUrl ? <img src={pr.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <span className="text-muted text-sm">—</span>}</td>
                   <td className="py-4">{pr.featured ? <span className="px-2 py-1 bg-accent/10 text-accent text-[10px] font-black rounded-lg">Featured</span> : <span className="text-muted text-sm">—</span>}</td>
-                  <td className="py-4 text-sm text-secondary">{(pr.techStack || []).join(', ')}</td>
+                  <td className="py-4">
+                    <div className="flex flex-wrap gap-1.5 max-w-xs">
+                      {(pr.techStack || []).map((tech, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-tag text-secondary text-[10px] font-bold rounded-full whitespace-nowrap">{tech}</span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="py-4 pr-4">
                     <ActionButtons onEdit={() => openEdit(tab, pr as unknown as Record<string, unknown>)} onDelete={() => setConfirmDelete(pr.id!)} />
                   </td>

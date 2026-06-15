@@ -58,8 +58,12 @@ export const ContentManager = () => {
   const openEdit = (t: Tab, item: Record<string, unknown>) => {
     setTechInput('');
     const clone = { ...item };
-    if (t === 'projects' && Array.isArray(clone.tech_stack)) {
-      clone.tech_stack = clone.tech_stack.join(', ');
+    if (t === 'projects') {
+      const arr = (Array.isArray(clone.techStack) ? clone.techStack : Array.isArray(clone.tech_stack) ? clone.tech_stack : null);
+      if (arr) {
+        clone.tech_stack = arr.join(', ');
+        delete clone.techStack;
+      }
     }
     setModal({ open: true, type: 'edit', tab: t, item: clone });
   };

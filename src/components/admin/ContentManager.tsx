@@ -19,7 +19,7 @@ const emptyForm = (tab: Tab): Record<string, unknown> => {
     case 'experiences': return { company: '', role: '', period: '', description: [''], order: 0 };
     case 'skills': return { category: '', items: [''], order: 0 };
     case 'education': return { school: '', degree: '', period: '', description: [''], order: 0 };
-    case 'projects': return { title: '', description: '', tech_stack: [''], featured: false, link: '', github: '', image_url: '' };
+    case 'projects': return { title: '', description: '', tech_stack: '', featured: false, link: '', github: '', image_url: '' };
   }
 };
 
@@ -52,7 +52,13 @@ export const ContentManager = () => {
   const currentData = dataMap[tab] as Record<string, unknown>[];
 
   const openCreate = (t: Tab) => setModal({ open: true, type: 'create', tab: t, item: emptyForm(t) });
-  const openEdit = (t: Tab, item: Record<string, unknown>) => setModal({ open: true, type: 'edit', tab: t, item: { ...item } });
+  const openEdit = (t: Tab, item: Record<string, unknown>) => {
+    const clone = { ...item };
+    if (t === 'projects' && Array.isArray(clone.tech_stack)) {
+      clone.tech_stack = clone.tech_stack.join(', ');
+    }
+    setModal({ open: true, type: 'edit', tab: t, item: clone });
+  };
 
   const handleProjectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,7 +80,7 @@ export const ContentManager = () => {
     const result: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(obj)) {
       if (key === 'featured' || key === 'id' || key === 'order') result[key] = val;
-      else if (key === 'tech_stack' || key === 'techStack' || key === 'items' || key === 'description') result[key] = sanitizeArray(val);
+      else if (key === 'items' || key === 'description') result[key] = sanitizeArray(val);
       else result[key] = sanitizeField(val);
     }
     return result;
@@ -101,7 +107,7 @@ export const ContentManager = () => {
           id: raw.id as string,
           title: raw.title as string,
           description: raw.description as string,
-          techStack: raw.tech_stack as string[],
+          techStack: ((raw.tech_stack as string) || '').split(',').map(t => sanitizeText(t.trim())).filter(Boolean),
           featured: raw.featured as boolean,
           link: sanitizeUrl(raw.link as string),
           github: sanitizeUrl(raw.github as string),
@@ -258,7 +264,7 @@ export const ContentManager = () => {
           <div className="space-y-4">
             <Input label="Title" value={(item as any).title || ''} onChange={v => set('title', v)} />
             <Textarea label="Description" value={(item as any).description || ''} onChange={v => set('description', v)} />
-            <ArrayInput label="Tech Stack" values={(item as any).tech_stack || ['']} onChange={v => set('tech_stack', v)} />
+            <Input label="Tech Stack" value={(item as any).tech_stack || ''} onChange={v => set('tech_stack', v)} placeholder="css, laravel, react" />
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={(item as any).featured || false} onChange={e => set('featured', e.target.checked)} className="w-4 h-4 rounded border-border text-accent focus:ring-accent" />
               <span className="text-sm font-bold text-primary">Featured Project</span>

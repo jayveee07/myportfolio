@@ -24,6 +24,7 @@ import { ADMIN_EMAIL, ADMIN_NAME } from '../lib/supabase';
 import { subscribeToActiveVisitors } from '../lib/supabase-data';
 import { Pencil, X as CloseX, Trash2, Pin, Ban, Download, ShieldAlert } from 'lucide-react';
 import { suggestAdminResponse } from '../lib/gemini';
+import { sanitizeText, MESSAGE_MAX_LENGTH } from '../lib/sanitize';
 
 export interface Visit {
   id: string;
@@ -146,7 +147,8 @@ export const AdminInbox = ({ user }: { user: { email?: string } }) => {
     e.preventDefault();
     if (!input.trim() || !selectedConvo) return;
 
-    const text = input.trim();
+    const text = sanitizeText(input.trim()).slice(0, MESSAGE_MAX_LENGTH);
+    if (!text) return;
     setInput('');
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     setAdminTypingStatus(selectedConvo.id, false);
@@ -186,8 +188,10 @@ export const AdminInbox = ({ user }: { user: { email?: string } }) => {
 
   const handleSaveEdit = async () => {
     if (!selectedConvo || !editingMessageId || !editInput.trim()) return;
+    const sanitized = sanitizeText(editInput.trim()).slice(0, MESSAGE_MAX_LENGTH);
+    if (!sanitized) return;
     try {
-      await editMessage(selectedConvo.id, editingMessageId, editInput.trim());
+      await editMessage(selectedConvo.id, editingMessageId, sanitized);
       setEditingMessageId(null);
       setEditInput('');
     } catch (err: any) {
@@ -220,11 +224,6 @@ export const AdminInbox = ({ user }: { user: { email?: string } }) => {
   const handleGetAiSuggestion = async () => {
     if (!selectedConvo || messages.length === 0) return;
     
-    if (!(typeof process !== 'undefined' && (process as any).env?.GEMINI_API_KEY)) {
-      setError("Gemini API Key is missing. Ensure GEMINI_API_KEY is set in your .env file.");
-      return;
-    }
-
     setIsAiLoading(true);
     setAiSuggestion(null);
     try {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Pencil, Trash2, X, Upload, Loader2, ImageUp } from 'lucide-react';
 import { getExperience, getSkills, getEducation, getProjects, createExperience, updateExperience, deleteExperience, createSkill, updateSkill, deleteSkill, createEducation, updateEducation, deleteEducation, createProject, updateProject, deleteProject, uploadProjectImage } from '../../lib/supabase-data';
+import { sanitizeText, sanitizeUrl, TEXTAREA_MAX_LENGTH } from '../../lib/sanitize';
 import type { Experience, SkillGroup, Education, Project } from '../../types/portfolio';
 
 type Tab = 'experiences' | 'skills' | 'education' | 'projects';
@@ -67,31 +68,43 @@ export const ContentManager = () => {
     }
   };
 
+  const sanitizeField = (v: unknown) => typeof v === 'string' ? sanitizeText(v) : v;
+  const sanitizeArray = (arr: unknown) => Array.isArray(arr) ? arr.map(sanitizeField) : arr;
+  const sanitizeEntity = (obj: Record<string, unknown>) => {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (key === 'featured' || key === 'id' || key === 'order') result[key] = val;
+      else if (key === 'tech_stack' || key === 'techStack' || key === 'items' || key === 'description') result[key] = sanitizeArray(val);
+      else result[key] = sanitizeField(val);
+    }
+    return result;
+  };
+
   const handleSave = async () => {
     const { tab: t, type, item } = modal;
     try {
       if (t === 'experiences') {
-        const exp = item as unknown as Experience;
+        const exp = sanitizeEntity(item as Record<string, unknown>) as unknown as Experience;
         if (type === 'create') await createExperience(exp as Omit<Experience, 'id'>);
         else await updateExperience(exp.id!, exp);
       } else if (t === 'skills') {
-        const sk = item as unknown as SkillGroup;
+        const sk = sanitizeEntity(item as Record<string, unknown>) as unknown as SkillGroup;
         if (type === 'create') await createSkill(sk as Omit<SkillGroup, 'id'>);
         else await updateSkill(sk.id!, sk);
       } else if (t === 'education') {
-        const ed = item as unknown as Education;
+        const ed = sanitizeEntity(item as Record<string, unknown>) as unknown as Education;
         if (type === 'create') await createEducation(ed as Omit<Education, 'id'>);
         else await updateEducation(ed.id!, ed);
       } else if (t === 'projects') {
-        const raw = item as Record<string, unknown>;
+        const raw = sanitizeEntity(item as Record<string, unknown>);
         const pr: Project = {
           id: raw.id as string,
           title: raw.title as string,
           description: raw.description as string,
           techStack: raw.tech_stack as string[],
           featured: raw.featured as boolean,
-          link: raw.link as string,
-          github: raw.github as string,
+          link: sanitizeUrl(raw.link as string),
+          github: sanitizeUrl(raw.github as string),
           imageUrl: raw.image_url as string || undefined,
         };
         if (type === 'create') await createProject(pr as Omit<Project, 'id'>);

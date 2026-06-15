@@ -16,6 +16,8 @@ import { getVisitorIp } from '../lib/ipService';
 import { recordVisit } from '../lib/supabase-data';
 import { useAuth } from '../context/SupabaseAuthContext';
 import { Pencil } from 'lucide-react';
+import { sanitizeText, sanitizeEmail, validateEmail, MESSAGE_MAX_LENGTH, NAME_MAX_LENGTH } from '../lib/sanitize';
+import { checkRateLimit } from '../lib/rate-limit';
 
 interface ChatWidgetProps {
   isOpen: boolean;
@@ -125,15 +127,12 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
 
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
-    const email = visitorEmail.trim();
-    if (!email) return;
-    
-    // Basic email validation regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    const email = sanitizeEmail(visitorEmail);
+    if (!email || !validateEmail(email)) {
       setError("Please enter a valid email address.");
       return;
     }
+    setVisitorEmail(email);
     
     setError(null);
 
@@ -142,12 +141,11 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
       // Mark session as active in this page load
       isFreshLogin = true;
       
-      const effectiveName = visitorName.trim() || email.split('@')[0];
-      // Use generated initial avatar if none uploaded
+      const effectiveName = sanitizeText(visitorName.trim() || email.split('@')[0]).slice(0, NAME_MAX_LENGTH);
       const avatar = visitorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(effectiveName)}&background=3b82f6&color=fff&bold=true`;
       
       localStorage.setItem('visitor_name', effectiveName);
-      localStorage.setItem('visitor_email', visitorEmail);
+      localStorage.setItem('visitor_email', email);
       localStorage.setItem('visitor_avatar', avatar);
       
       recordVisit(window.location.pathname);
@@ -158,7 +156,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
 
       const convoId = await startConversation({ 
         name: effectiveName, 
-        email: visitorEmail,
+        email,
         ip: visitorIp
       });
       
@@ -193,15 +191,22 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
     e.preventDefault();
     if (!input.trim() || !user || isBlocked) return;
 
-    const text = input.trim();
+    const text = sanitizeText(input.trim()).slice(0, MESSAGE_MAX_LENGTH);
     setInput('');
+
+    const rateCheck = checkRateLimit(`chat:${visitorEmail}`, 20, 60000);
+    if (!rateCheck.allowed) {
+      setError('Too many messages. Please slow down.');
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
     
     const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
     
     try {
       await sendMessage(convoId, text, { 
-        name: visitorName || 'Guest',
-        email: visitorEmail,
+        name: sanitizeText(visitorName || 'Guest').slice(0, NAME_MAX_LENGTH),
+        email: sanitizeEmail(visitorEmail),
         ip: visitorIp,
         avatar: visitorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(visitorName || 'G')}&background=3b82f6&color=fff`
       });
@@ -213,7 +218,7 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
   };
 
   const handleStartEdit = (msg: MessageType) => {
-    if (msg.senderId !== visitorEmail) return;
+    if (sanitizeEmail(msg.senderId) !== sanitizeEmail(visitorEmail)) return;
     
     const created = msg.createdAt ? new Date(msg.createdAt).getTime() : Date.now();
     const now = Date.now();
@@ -225,6 +230,20 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
     
     setEditingMessageId(msg.id || null);
     setEditInput(msg.text);
+  };
+
+  const handleSaveEdit = async () => {
+    const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+    if (!convoId || !editingMessageId || !editInput.trim()) return;
+    const sanitized = sanitizeText(editInput.trim()).slice(0, MESSAGE_MAX_LENGTH);
+    if (!sanitized) return;
+    try {
+      await editMessage(convoId, editingMessageId, sanitized);
+      setEditingMessageId(null);
+      setEditInput('');
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   const handleDiscardEdit = () => {
@@ -242,18 +261,6 @@ export const ChatWidget = ({ isOpen, onOpen, onClose, adminName, isShifted }: Ch
     } else {
       setEditingMessageId(null);
       setEditInput('');
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    const convoId = currentConvoId || `vst_${visitorEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
-    if (!convoId || !editingMessageId || !editInput.trim()) return;
-    try {
-      await editMessage(convoId, editingMessageId, editInput.trim());
-      setEditingMessageId(null);
-      setEditInput('');
-    } catch (err: any) {
-      setError(err.message);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { motion, useScroll, useSpring, AnimatePresence } from 'motion/react';
 import { ArrowUp } from 'lucide-react';
 
@@ -24,6 +24,7 @@ import { BlogDetail } from './components/BlogDetail';
 import { ScrollReveal } from './components/ScrollReveal';
 import { ModernFooter } from './components/ModernFooter';
 import { ADMIN_EMAIL } from './lib/supabase';
+import { startAdminSessionMonitor, resetAdminTimer } from './lib/session';
 import type { Profile, Experience, SkillGroup, Education } from './types/portfolio';
 
 const AdminPanel = lazy(() => import('./components/admin/AdminPanel').then(m => ({ default: m.AdminPanel })));
@@ -58,7 +59,7 @@ export default function App() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [sectionsVisible, setSectionsVisible] = useState<string[] | null>(null);
 
-  const { user, signInAdmin } = useAuth();
+  const { user, signInAdmin, signOut } = useAuth();
   const { data: profileData } = useProfile();
   const { data: experienceData = [] } = useExperience();
   const { data: skillsData = [] } = useSkills();
@@ -69,6 +70,8 @@ export default function App() {
   const skills = skillsData as SkillGroup[];
   const education = educationData as Education[];
 
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
   useEffect(() => {
     if (profileData) {
       setProfile(prev => ({ ...prev, ...profileData }));
@@ -76,6 +79,22 @@ export default function App() {
       if (profileData.sectionsVisible) setSectionsVisible(profileData.sectionsVisible);
     }
   }, [profileData]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      const cleanup = startAdminSessionMonitor(() => {
+        signOut();
+        localStorage.removeItem('is_admin');
+        window.location.href = '/';
+      });
+      const resetTimer = () => resetAdminTimer();
+      window.addEventListener('admin-navigate', resetTimer);
+      return () => {
+        cleanup();
+        window.removeEventListener('admin-navigate', resetTimer);
+      };
+    }
+  }, [isAdmin, signOut]);
 
   const isSectionVisible = (key: SectionKey) =>
     !sectionsVisible?.length || sectionsVisible.includes(key);
@@ -121,8 +140,6 @@ export default function App() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  const isAdmin = user?.email === ADMIN_EMAIL;
 
   useEffect(() => {
     let isMounted = true;

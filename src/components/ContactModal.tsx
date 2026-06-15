@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Mail, CheckCircle, Shield, Loader2, Copy, ExternalLink } from 'lucide-react';
 import { submitInquiry } from '../lib/supabase-data';
+import { sanitizeText, sanitizeEmail, validateEmail, NAME_MAX_LENGTH, TEXTAREA_MAX_LENGTH } from '../lib/sanitize';
+import { checkRateLimit } from '../lib/rate-limit';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -31,23 +33,30 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
     
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const email = formData.get('email') as string;
-    const name = formData.get('name') as string;
-    const message = formData.get('message') as string;
+    const rawEmail = (formData.get('email') as string) || '';
+    const rawName = (formData.get('name') as string) || '';
+    const rawMessage = (formData.get('message') as string) || '';
     
-    // Validate email
-    if (!email || !isValidEmail(email)) {
+    const name = sanitizeText(rawName).slice(0, NAME_MAX_LENGTH);
+    const email = sanitizeEmail(rawEmail);
+    const message = sanitizeText(rawMessage).slice(0, TEXTAREA_MAX_LENGTH);
+    
+    if (!email || !validateEmail(email)) {
       setEmailError('Please enter a valid email address.');
+      return;
+    }
+    
+    const rateCheck = checkRateLimit(`contact:${email}`, 3, 60000);
+    if (!rateCheck.allowed) {
+      setErrorMessage('Too many requests. Please wait before sending another message.');
       return;
     }
     
     setFormStatus('sending');
     
     try {
-      // Step 1: Backup to Firestore so you never lose a message
       await submitInquiry({ name, email, message });
       
-      // Step 2: Send email using Web3Forms
       if (!WEB3FORMS_ACCESS_KEY) {
         throw new Error("Web3Forms access key is not configured. Please check ContactModal.tsx.");
       }

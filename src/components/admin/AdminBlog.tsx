@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ExternalLink, X, Loader, FileText, ImageUp } from 'lucide-react';
 import { useCreateBlogPost, useUpdateBlogPost, useDeleteBlogPost } from '../../hooks/usePortfolioData';
 import { getBlogPosts, uploadBlogImage, deleteStorageFileFromUrl, getBlogPostById } from '../../lib/supabase-data';
+import { sanitizeText, sanitizeUrl, MESSAGE_MAX_LENGTH } from '../../lib/sanitize';
 import type { BlogPost } from '../../types/portfolio';
 
 const emptyForm = { title: '', excerpt: '', date: '', readTime: '', link: '', tags: '', imageUrl: '', content: '' };
@@ -73,14 +74,14 @@ export const AdminBlog = () => {
     setSaving(true);
     try {
       const payload = {
-        title: form.title.trim(),
-        excerpt: form.excerpt.trim(),
+        title: sanitizeText(form.title.trim()).slice(0, 200),
+        excerpt: sanitizeText(form.excerpt.trim()).slice(0, 500),
         date: form.date || new Date().toISOString().split('T')[0],
-        readTime: form.readTime.trim() || '5 min read',
-        tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
-        link: form.link.trim(),
+        readTime: sanitizeText(form.readTime.trim()).slice(0, 50) || '5 min read',
+        tags: form.tags.split(',').map(t => sanitizeText(t.trim())).filter(Boolean),
+        link: sanitizeUrl(form.link.trim()),
         imageUrl: form.imageUrl || undefined,
-        content: form.content.trim() || undefined,
+        content: sanitizeText(form.content.trim()).slice(0, MESSAGE_MAX_LENGTH) || undefined,
       };
 
       if (editing) {

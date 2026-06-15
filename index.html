@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Portfolio of John Vince Paisan, a software developer specializing in web development." />
     <meta name="keywords" content="John Vince Paisan, web developer, portfolio, software engineer, frontend developer, fullstack developer" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: blob: https://ui-avatars.com https://*.supabase.co https://api.ipify.org https://images.unsplash.com https://*.googleusercontent.com https://avatars.githubusercontent.com;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' https://*.supabase.co https://api.ipify.org https://api.web3forms.com https://generativelanguage.googleapis.com wss://*.supabase.co;
+      frame-src 'self' https://*.supabase.co;
+      media-src 'self';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self' https://api.web3forms.com;
+      manifest-src 'self';
+    " />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="X-Content-Type-Options" content="nosniff" />
+    <meta name="X-Frame-Options" content="DENY" />
     <title>John Vince Paisan - Portfolio</title>
     <link rel="icon" type="image/png" href="/src/assets/logoM.png" />
   </head>
@@ -13,4 +30,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

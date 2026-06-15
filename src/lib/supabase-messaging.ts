@@ -1,6 +1,7 @@
 import { supabase, ADMIN_EMAIL, ADMIN_NAME, ADMIN_AVATAR } from './supabase';
 import { syncVisitorIdentity } from './supabase-data';
 import { generateChatResponse } from './gemini';
+import { sanitizeText, sanitizeEmail, MESSAGE_MAX_LENGTH, NAME_MAX_LENGTH } from './sanitize';
 
 export interface Message {
   id?: string;
@@ -121,15 +122,18 @@ export const sendMessage = async (
   visitorInfo: { name: string; email: string; avatar?: string; ip?: string },
   isAdminReply = false
 ) => {
-  const senderId = isAdminReply ? ADMIN_EMAIL : visitorInfo.email.toLowerCase();
+  const safeEmail = sanitizeEmail(visitorInfo.email);
+  const senderId = isAdminReply ? ADMIN_EMAIL : safeEmail;
+  const safeText = sanitizeText(text).slice(0, MESSAGE_MAX_LENGTH);
+  const safeName = sanitizeText(visitorInfo.name).slice(0, NAME_MAX_LENGTH);
 
   const { error: msgError } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
-      text,
+      text: safeText,
       sender_id: senderId,
-      sender_name: isAdminReply ? ADMIN_NAME : visitorInfo.name,
+      sender_name: isAdminReply ? ADMIN_NAME : safeName,
       sender_avatar: isAdminReply ? ADMIN_AVATAR : (visitorInfo.avatar?.startsWith('data:') ? null : visitorInfo.avatar),
       sender_ip: isAdminReply ? 'admin' : (visitorInfo.ip || 'unknown'),
     });
@@ -203,12 +207,15 @@ export const sendMessage = async (
 };
 
 export const startConversation = async (visitorInfo: { name: string; email: string; avatar?: string; ip?: string }) => {
-  await syncVisitorIdentity(visitorInfo.email);
+  const safeEmail = sanitizeEmail(visitorInfo.email);
+  const safeName = sanitizeText(visitorInfo.name).slice(0, NAME_MAX_LENGTH);
+
+  await syncVisitorIdentity(safeEmail);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Authentication failed. Please try refreshing.');
 
-  const conversationId = getChatId(visitorInfo.email);
+  const conversationId = getChatId(safeEmail);
 
   const { data: existing } = await supabase
     .from('conversations')
@@ -218,15 +225,15 @@ export const startConversation = async (visitorInfo: { name: string; email: stri
 
   const payload: Record<string, unknown> = {
     visitor_uid: user.id,
-    visitor_name: visitorInfo.name,
-    visitor_email: visitorInfo.email.toLowerCase(),
+    visitor_name: safeName,
+    visitor_email: safeEmail,
     updated_at: new Date().toISOString(),
   };
 
   if (visitorInfo.avatar && visitorInfo.avatar.length < 100000) payload.visitor_avatar = visitorInfo.avatar;
   if (visitorInfo.ip) payload.visitor_ip = visitorInfo.ip;
 
-  const participants = [visitorInfo.email.toLowerCase(), ADMIN_EMAIL, user.id];
+  const participants = [safeEmail, ADMIN_EMAIL, user.id];
 
   if (!existing) {
     await supabase.from('conversations').insert({
@@ -275,7 +282,8 @@ export const editMessage = async (conversationId: string, messageId: string, new
     throw new Error('Editing window expired (10 minutes).');
   }
 
-  await supabase.from('messages').update({ text: newText, is_edited: true }).eq('id', messageId);
+  const safeText = sanitizeText(newText).slice(0, MESSAGE_MAX_LENGTH);
+  await supabase.from('messages').update({ text: safeText, is_edited: true }).eq('id', messageId);
 
   const { data: convo } = await supabase
     .from('conversations')

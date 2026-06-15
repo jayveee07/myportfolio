@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { Database } from './supabase-types';
 import type { Experience, SkillGroup, Education, Project, Testimonial, BlogPost, Profile } from '../types/portfolio';
+import { sanitizeText, sanitizeEmail, MESSAGE_MAX_LENGTH, NAME_MAX_LENGTH, TEXTAREA_MAX_LENGTH } from './sanitize';
 
 export const getExperience = async (): Promise<Experience[]> => {
   const { data, error } = await supabase
@@ -238,16 +239,20 @@ export const deleteProject = async (id: string) => {
 };
 
 export const submitInquiry = async (inquiry: { name: string; email: string; message: string }) => {
-  const conversationId = `vst_${inquiry.email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+  const safeName = sanitizeText(inquiry.name).slice(0, NAME_MAX_LENGTH);
+  const safeEmail = sanitizeEmail(inquiry.email);
+  const safeMessage = sanitizeText(inquiry.message).slice(0, TEXTAREA_MAX_LENGTH);
+
+  const conversationId = `vst_${safeEmail.replace(/[^a-z0-9]/g, '_')}`;
 
   const { error: convoError } = await supabase
     .from('conversations')
     .upsert({
       id: conversationId,
-      participants: [inquiry.email.toLowerCase(), ADMIN_EMAIL],
-      visitor_name: inquiry.name,
-      visitor_email: inquiry.email.toLowerCase(),
-      last_message: inquiry.message,
+      participants: [safeEmail, ADMIN_EMAIL],
+      visitor_name: safeName,
+      visitor_email: safeEmail,
+      last_message: safeMessage,
       unread_count: 1,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
@@ -258,9 +263,9 @@ export const submitInquiry = async (inquiry: { name: string; email: string; mess
     .from('messages')
     .insert({
       conversation_id: conversationId,
-      text: inquiry.message,
-      sender_id: inquiry.email.toLowerCase(),
-      sender_name: inquiry.name,
+      text: safeMessage,
+      sender_id: safeEmail,
+      sender_name: safeName,
     });
 
   if (msgError) throw msgError;
@@ -289,10 +294,10 @@ export const submitTestimonial = async (testimonial: Omit<Testimonial, 'id'>) =>
   const { error } = await supabase
     .from('testimonials')
     .insert({
-      name: testimonial.name,
-      role: testimonial.role,
-      company: testimonial.company,
-      text: testimonial.text,
+      name: sanitizeText(testimonial.name).slice(0, NAME_MAX_LENGTH),
+      role: sanitizeText(testimonial.role).slice(0, NAME_MAX_LENGTH),
+      company: sanitizeText(testimonial.company).slice(0, NAME_MAX_LENGTH),
+      text: sanitizeText(testimonial.text).slice(0, TEXTAREA_MAX_LENGTH),
       avatar: testimonial.avatar,
     });
   if (error) throw error;

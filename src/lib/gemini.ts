@@ -1,17 +1,8 @@
-import { GoogleGenAI } from '@google/genai';
+import { supabase } from './supabase';
 
-const API_KEY = (typeof process !== 'undefined' && (process as any).env?.GEMINI_API_KEY) as string | undefined;
 const MODEL = 'gemini-2.0-flash';
 
-let ai: any = null;
-
-function getAI() {
-  if (ai) return ai;
-  if (API_KEY) {
-    ai = new GoogleGenAI({ apiKey: API_KEY });
-  }
-  return ai;
-}
+let aiInitialized = false;
 
 const requestLog: number[] = [];
 let cooldownUntil = 0;
@@ -100,7 +91,7 @@ const rules: Rule[] = [
   },
   {
     keywords: ['agent', 'human', 'talk to human', 'talk to person', 'real person'],
-    response: "🔄 If you'd like to speak with John Vince directly, just type 'agent' in your next message and I'll hand you over to him!",
+    response: "\uD83D\uDD04 If you'd like to speak with John Vince directly, just type 'agent' in your next message and I'll hand you over to him!",
   },
 ];
 
@@ -143,9 +134,39 @@ function smartFallback(userMessage: string): string {
   return greetings[Math.floor(Math.random() * greetings.length)];
 }
 
+async function callEdgeFunction(action: string, params: Record<string, unknown>) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gemini-chat`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || anonKey}`,
+      },
+      body: JSON.stringify({ action, ...params }),
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function generateChatResponse(userMessage: string, visitorName: string) {
-  const client = getAI();
-  if (!client) return smartFallback(userMessage);
+  if (!aiInitialized) {
+    try {
+      const testResponse = await callEdgeFunction('chat', { message: 'ping', visitorName: 'system' });
+      if (testResponse) aiInitialized = true;
+    } catch {
+      return smartFallback(userMessage);
+    }
+  }
 
   if (Date.now() < cooldownUntil) return smartFallback(userMessage);
 
@@ -158,14 +179,7 @@ export async function generateChatResponse(userMessage: string, visitorName: str
   requestLog.push(Date.now());
 
   try {
-    const prompt = `You are a friendly AI assistant for John Vince Paisan's portfolio website. Answer questions about his skills, experience, and projects concisely. If unsure, suggest contacting John Vince directly.\n\nThe visitor (${visitorName}) says: ${userMessage}`;
-
-    const response = await client.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-      config: { temperature: 0.7, maxOutputTokens: 200 },
-    });
-
+    const response = await callEdgeFunction('chat', { message: userMessage, visitorName });
     const text = response.text || smartFallback(userMessage);
     cacheResponse(cacheKey, text);
     return text;
@@ -179,23 +193,13 @@ export async function generateChatResponse(userMessage: string, visitorName: str
 }
 
 export async function suggestAdminResponse(messages: unknown[], visitorName: string) {
-  const client = getAI();
-  if (!client) return null;
-
   try {
     const history = (messages as Array<{ text: string; senderName: string }>)
       .slice(-10)
       .map(m => `${m.senderName}: ${m.text}`)
       .join('\n');
 
-    const prompt = `You help an admin respond to visitors. Suggest a brief, professional response from John Vince Paisan.\n\nConversation with ${visitorName}:\n${history}\n\nSuggest a response:`;
-
-    const response = await client.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-      config: { temperature: 0.5, maxOutputTokens: 150 },
-    });
-
+    const response = await callEdgeFunction('suggest', { history, visitorName });
     return response.text || null;
   } catch (err) {
     console.error('Gemini suggestAdminResponse error:', err);

@@ -131,15 +131,15 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                   <Mail size={20} />
                 </div>
                 <h3 className="text-2xl font-black text-primary uppercase tracking-tighter mb-4">Secure<br />Dispatch</h3>
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-relaxed">Encrypted message transmission protocol.</p>
+                <p className="text-xs text-secondary font-bold uppercase tracking-widest leading-relaxed">Encrypted message transmission protocol.</p>
               </div>
               
               <div className="space-y-6 mt-12 md:mt-0">
                 <div className="flex items-center gap-3">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">System Online</span>
+                  <span className="text-[10px] font-mono font-bold text-secondary uppercase tracking-widest">System Online</span>
                 </div>
-                <p className="text-[10px] font-mono font-bold text-slate-300 leading-tight uppercase tracking-widest">
+                <p className="text-[10px] font-mono font-bold text-muted leading-tight uppercase tracking-widest">
                   Response Latency:<br /><span className="text-primary">{LESS_THAN_24}</span>
                 </p>
               </div>
@@ -147,23 +147,23 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
 
             {/* Form Area */}
             <div className="flex-1 p-10">
-              <button onClick={onClose} className="absolute top-8 right-8 p-2 text-slate-300 hover:text-primary transition-colors">
+              <button onClick={onClose} className="absolute top-8 right-8 p-2 text-muted hover:text-primary transition-colors">
                 <X size={24} />
               </button>
 
               <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">Identity</label>
-                  <input type="text" name="name" required placeholder="Your Full Name" className="w-full px-5 py-4 rounded-xl border border-line bg-white focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold" />
+                  <label className="text-[10px] font-mono font-bold text-secondary uppercase tracking-widest pl-1">Identity</label>
+                  <input type="text" name="name" required placeholder="Your Full Name" className="w-full px-5 py-4 rounded-xl border border-line bg-surface focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">Return Path</label>
+                  <label className="text-[10px] font-mono font-bold text-secondary uppercase tracking-widest pl-1">Return Path</label>
                   <input 
                     type="email" 
                     name="email" 
                     required 
                     placeholder="email@domain.com" 
-                    className={`w-full px-5 py-4 rounded-xl border bg-white focus:outline-none focus:ring-1 transition-all text-sm font-bold ${emailError ? 'border-red-300 focus:ring-red-200' : 'border-line focus:ring-accent'}`}
+                    className={`w-full px-5 py-4 rounded-xl border bg-surface focus:outline-none focus:ring-1 transition-all text-sm font-bold ${emailError ? 'border-red-300 focus:ring-red-200' : 'border-line focus:ring-accent'}`}
                     onChange={() => setEmailError('')}
                   />
                   {emailError && (
@@ -178,8 +178,8 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest pl-1">Message Payload</label>
-                  <textarea name="message" required rows={4} placeholder="Describe your inquiry..." className="w-full px-5 py-4 rounded-xl border border-line bg-white focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold resize-none" />
+                  <label className="text-[10px] font-mono font-bold text-secondary uppercase tracking-widest pl-1">Message Payload</label>
+                  <textarea name="message" required rows={4} placeholder="Describe your inquiry..." className="w-full px-5 py-4 rounded-xl border border-line bg-surface focus:outline-none focus:ring-1 focus:ring-accent transition-all text-sm font-bold resize-none" />
                 </div>
 
                 {/* Error Message */}
@@ -187,7 +187,7 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-red-50 text-red-600 text-sm p-4 rounded-xl border border-red-100"
+                    className="bg-red-50 dark:bg-red-950/30 text-red-600 text-sm p-4 rounded-xl border border-red-100 dark:border-red-900/50"
                   >
                     {errorMessage}
                   </motion.div>
@@ -200,19 +200,19 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                     animate={{ opacity: 1, y: 0 }}
                     className="flex flex-col gap-3"
                   >
-                    <p className="text-xs text-slate-500 text-center">Or contact directly:</p>
+                    <p className="text-xs text-secondary text-center">Or contact directly:</p>
                     <div className="flex gap-3">
                       <button
                         type="button"
                         onClick={copyEmail}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold transition-all"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-surface-alt hover:bg-surface-alt/80 rounded-xl text-sm font-semibold transition-all"
                       >
                         <Copy size={16} />
                         {copied ? 'Copied!' : 'Copy Email'}
                       </button>
                       <a
                         href={`mailto:${profile?.email || 'jvpaisan@gmail.com'}?subject=Portfolio Contact`}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold transition-all"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-surface-alt hover:bg-surface-alt/80 rounded-xl text-sm font-semibold transition-all"
                       >
                         <ExternalLink size={16} />
                         Open Email App
@@ -242,7 +242,7 @@ export const ContactModal = ({ isOpen, onClose, profile }: ContactModalProps) =>
                   )}
                 </button>
                 
-                <p className="text-center text-[9px] font-mono font-bold text-slate-300 uppercase tracking-widest mt-4">
+                <p className="text-center text-[9px] font-mono font-bold text-muted uppercase tracking-widest mt-4">
                   <Shield size={10} className="inline mr-1" /> Verified Secure Connection
                 </p>
               </form>
